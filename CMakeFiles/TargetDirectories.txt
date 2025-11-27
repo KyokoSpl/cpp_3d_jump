@@ -1,0 +1,3 @@
+/home/kyoko/src/processing-code/cpp_version/build/CMakeFiles/processing3d.dir
+/home/kyoko/src/processing-code/cpp_version/build/CMakeFiles/edit_cache.dir
+/home/kyoko/src/processing-code/cpp_version/build/CMakeFiles/rebuild_cache.dir
