@@ -70,6 +70,21 @@ make
 - Collision detection
 - Fullscreen window
 
+## Sound Customization
+
+The popup notification sound can be customized in `Menu.cpp` in the `generatePopupSound()` function:
+
+- **frequency**: Any value in Hz works. Recommended range: 200-2000 Hz
+  - 261.63 Hz = C4 (Middle C)
+  - 440.00 Hz = A4 (Concert pitch)
+  - 523.25 Hz = C5
+  - 659.25 Hz = E5
+  - 880.00 Hz = A5
+  - 1046.50 Hz = C6
+- **duration**: Length in milliseconds (50-200 recommended for a short blip)
+
+The sound is generated as a sine wave with harmonics and an envelope for a pleasant "blob" effect.
+
 ## Notes
 
 - The code uses legacy OpenGL (immediate mode) for simplicity, similar to Processing's approach

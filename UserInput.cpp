@@ -34,10 +34,10 @@ Vector3 Vector3::copy() const {
 
 // UserInput methods
 UserInput::UserInput() {
-    // Starting/spawn position
-    spawnX = 0;
+    // Starting/spawn position - at the start of the parkour course
+    spawnX = -350;
     spawnY = 100;
-    spawnZ = 0;
+    spawnZ = -320;  // Parkour course Z position
     
     playerX = spawnX;
     playerY = spawnY;
@@ -52,12 +52,23 @@ UserInput::UserInput() {
     gravity = -0.8f;
     jumpForce = 15;
     grounded = false;
+    coyoteTimer = 0.0f;
     normalHeight = 100;
     crouchHeight = 50;
     playerHeight = normalHeight;
     isCrouching = false;
     collisionRadius = 20;
     deathY = -100;  // Fall below this and respawn
+    devMode = false;  // Set via setDevMode()
+    renderDistance = 3000.0f;  // Default render distance
+    sensitivity = 0.003f;  // Default mouse sensitivity
+    fov = 60.0f;  // Default field of view
+    
+    // Timer and stats
+    timer = 0.0f;
+    timerRunning = false;
+    timerFinished = false;
+    deathCount = 0;
 }
 
 Vector3 UserInput::getViewVector() {
@@ -72,17 +83,15 @@ Vector3 UserInput::getViewVector() {
 }
 
 void UserInput::rotate(float dx, float dy) {
-    float sensitivity = 0.003f;
-    
     yaw += dx * sensitivity;
-    pitch += dy * sensitivity;
+    pitch -= dy * sensitivity;  // Inverted: pull down to look down, pull up to look up
     
     // Constrain pitch to prevent flipping
     pitch = std::max(-static_cast<float>(M_PI)/2.0f + 0.01f, 
                      std::min(static_cast<float>(M_PI)/2.0f - 0.01f, pitch));
 }
 
-void UserInput::move(bool forward, bool backward, bool left, bool right, ObstacleCourse* course) {
+void UserInput::move(bool forward, bool backward, bool left, bool right, ObstacleCourse* course, float deltaTime) {
     // Get view direction
     Vector3 v = getViewVector();
     
@@ -94,24 +103,27 @@ void UserInput::move(bool forward, bool backward, bool left, bool right, Obstacl
     Vector3 rightV = forwardV.cross(Vector3(0, 1, 0));
     rightV.normalize();
     
+    // Normalize speed to 60 FPS base (deltaTime * 60 = 1.0 at 60 FPS)
+    float frameSpeed = SPEED * deltaTime * 60.0f;
+    
     float moveX = 0;
     float moveZ = 0;
     
     if (forward) {
-        moveX += forwardV.x * SPEED;
-        moveZ += forwardV.z * SPEED;
+        moveX += forwardV.x * frameSpeed;
+        moveZ += forwardV.z * frameSpeed;
     }
     if (backward) {
-        moveX -= forwardV.x * SPEED;
-        moveZ -= forwardV.z * SPEED;
+        moveX -= forwardV.x * frameSpeed;
+        moveZ -= forwardV.z * frameSpeed;
     }
     if (right) {
-        moveX += rightV.x * SPEED;
-        moveZ += rightV.z * SPEED;
+        moveX += rightV.x * frameSpeed;
+        moveZ += rightV.z * frameSpeed;
     }
     if (left) {
-        moveX -= rightV.x * SPEED;
-        moveZ -= rightV.z * SPEED;
+        moveX -= rightV.x * frameSpeed;
+        moveZ -= rightV.z * frameSpeed;
     }
     
     // Try X movement
@@ -127,16 +139,25 @@ void UserInput::move(bool forward, bool backward, bool left, bool right, Obstacl
     }
 }
 
-void UserInput::update(int windowWidth, int windowHeight, ObstacleCourse* course, Grid* grid) {
+void UserInput::update(int windowWidth, int windowHeight, ObstacleCourse* course, Grid* grid, float deltaTime) {
+    // Update timer if running
+    if (timerRunning) {
+        timer += deltaTime;
+    }
+    
+    // Normalize to 60 FPS base
+    float timeScale = deltaTime * 60.0f;
+    
     // Smoothly adjust height when crouching
     float targetHeight = isCrouching ? crouchHeight : normalHeight;
-    playerHeight += (targetHeight - playerHeight) * 0.2f;
+    float lerpFactor = 1.0f - std::pow(1.0f - 0.2f, timeScale);  // Frame-rate independent lerp
+    playerHeight += (targetHeight - playerHeight) * lerpFactor;
     
-    // Apply gravity
-    yVel += gravity;
+    // Apply gravity (scaled by delta time)
+    yVel += gravity * timeScale;
     
-    // Try to move vertically
-    float newY = playerY + yVel;
+    // Try to move vertically (velocity also scaled by delta time)
+    float newY = playerY + yVel * timeScale;
     
     // Check if we're standing on an obstacle
     float obstacleFloorY = 0;
@@ -146,6 +167,11 @@ void UserInput::update(int windowWidth, int windowHeight, ObstacleCourse* course
     
     // Determine floor height
     float floorY = -1000.0f;  // Default: no floor (will fall forever)
+    
+    // In dev mode, add a floor at Y=0 everywhere so player doesn't fall forever
+    if (devMode) {
+        floorY = 0.0f;
+    }
     
     // Check if player is within grid bounds
     bool onGrid = grid && !grid->isOutOfBounds(playerX, playerZ);
@@ -173,8 +199,15 @@ void UserInput::update(int windowWidth, int windowHeight, ObstacleCourse* course
         playerY = floorY + playerHeight;
         yVel = 0;
         grounded = true;
+        coyoteTimer = 0.1f;  // Reset coyote time when on ground
     } else {
-        grounded = false;
+        // Coyote time: allow jumping briefly after leaving edge
+        if (coyoteTimer > 0) {
+            coyoteTimer -= deltaTime;
+            grounded = true;  // Still considered grounded during coyote time
+        } else {
+            grounded = false;
+        }
     }
     
     // Check if fallen off the map
@@ -188,33 +221,52 @@ void UserInput::update(int windowWidth, int windowHeight, ObstacleCourse* course
     }
     
     // Respawn if: fell below death zone OR (off grid AND below spawn height)
-    if (playerY < deathY || (offGrid && playerY < spawnY - 10)) {
+    // Skip respawn in dev mode
+    if (!devMode && (playerY < deathY || (offGrid && playerY < spawnY - 10))) {
         std::cout << "RESPAWNING!" << std::endl;
         respawn();
     }
     
-    // Set up 3rd person camera
+    // Set up camera - first person if zoomed in close, otherwise third person
     Vector3 viewDir = getViewVector();
     
-    // Camera position behind and above player
-    float cameraX = playerX - viewDir.x * cameraDistance;
-    float cameraY = playerY + playerHeight * 0.5f - viewDir.y * cameraDistance;
-    float cameraZ = playerZ - viewDir.z * cameraDistance;
+    float cameraX, cameraY, cameraZ;
+    float lookAtX, lookAtY, lookAtZ;
     
-    // Look at player center
-    float lookAtX = playerX;
-    float lookAtY = playerY + playerHeight * 0.5f;
-    float lookAtZ = playerZ;
+    // First person threshold - switch at distance < 20
+    bool firstPerson = cameraDistance < 20.0f;
+    
+    if (firstPerson) {
+        // First person: camera at player eye level
+        cameraX = playerX;
+        cameraY = playerY + playerHeight * 0.4f;  // Eye level (slightly below top of head)
+        cameraZ = playerZ;
+        
+        // Look forward in view direction
+        lookAtX = cameraX + viewDir.x * 100.0f;
+        lookAtY = cameraY + viewDir.y * 100.0f;
+        lookAtZ = cameraZ + viewDir.z * 100.0f;
+    } else {
+        // Third person: camera behind and above player
+        cameraX = playerX - viewDir.x * cameraDistance;
+        cameraY = playerY + playerHeight * 0.5f - viewDir.y * cameraDistance;
+        cameraZ = playerZ - viewDir.z * cameraDistance;
+        
+        // Look at player center
+        lookAtX = playerX;
+        lookAtY = playerY + playerHeight * 0.5f;
+        lookAtZ = playerZ;
+    }
     
     // Set up projection matrix
     glMatrixMode(GL_PROJECTION);
     glLoadIdentity();
     float aspect = static_cast<float>(windowWidth) / static_cast<float>(windowHeight);
-    float fov = 60.0f * M_PI / 180.0f;
+    float fovRad = fov * M_PI / 180.0f;
     float nearPlane = 0.1f;
-    float farPlane = 1000.0f;
+    float farPlane = renderDistance;
     
-    float f = 1.0f / std::tan(fov / 2.0f);
+    float f = 1.0f / std::tan(fovRad / 2.0f);
     float rangeInv = 1.0f / (nearPlane - farPlane);
     
     float matrix[16] = {
@@ -262,7 +314,20 @@ void UserInput::setCrouch(bool crouch) {
     isCrouching = crouch;
 }
 
-void UserInput::respawn() {
+void UserInput::adjustCameraDistance(float delta) {
+    cameraDistance -= delta * 10.0f;  // Scroll up = zoom in, scroll down = zoom out
+    // Clamp camera distance - allow 0 for first person
+    if (cameraDistance < 0.0f) cameraDistance = 0.0f;
+    if (cameraDistance > 400.0f) cameraDistance = 400.0f;
+}
+
+void UserInput::setPhysics(float speed, float grav, float jump) {
+    SPEED = speed;
+    gravity = grav;
+    jumpForce = jump;
+}
+
+void UserInput::resetPosition() {
     playerX = spawnX;
     playerY = spawnY;
     playerZ = spawnZ;
@@ -270,8 +335,41 @@ void UserInput::respawn() {
     grounded = false;
 }
 
+void UserInput::respawn() {
+    playerX = spawnX;
+    playerY = spawnY;
+    playerZ = spawnZ;
+    yVel = 0;
+    grounded = false;
+    deathCount++;  // Increment death counter
+}
+
+void UserInput::toggleTimer() {
+    if (!timerFinished) {  // Can only toggle if not finished
+        timerRunning = !timerRunning;
+    }
+}
+
+void UserInput::stopTimer() {
+    timerRunning = false;
+    timerFinished = true;
+}
+
+void UserInput::resetStats() {
+    timer = 0.0f;
+    timerRunning = false;
+    timerFinished = false;
+    deathCount = 0;
+}
+
 void UserInput::render() {
-    drawStickFigure();
+    // Always draw shadow circle (visible in both first and third person)
+    drawShadow();
+    
+    // Only draw stick figure in third person mode
+    if (cameraDistance >= 20.0f) {
+        drawStickFigure();
+    }
 }
 
 void UserInput::drawStickFigure() {
@@ -325,6 +423,49 @@ void UserInput::drawStickFigure() {
     glVertex3f(legSpread, 0, 0);
     
     glEnd();
+    
+    glPopMatrix();
+}
+
+void UserInput::drawShadow() {
+    glPushMatrix();
+    
+    // Position shadow at player's feet, raised above ground to avoid z-fighting
+    glTranslatef(playerX, playerY - playerHeight + 2.0f, playerZ);
+    
+    // Rotate to lay flat on ground (rotate around X axis)
+    glRotatef(90.0f, 1, 0, 0);
+    
+    // Disable depth test to ensure shadow always renders on top of ground
+    glDisable(GL_DEPTH_TEST);
+    
+    // Enable blending for semi-transparent shadow
+    glEnable(GL_BLEND);
+    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+    
+    // Outer shadow - collision radius (lighter)
+    glColor4f(0.0f, 0.0f, 0.0f, 0.3f);
+    glBegin(GL_TRIANGLE_FAN);
+    glVertex3f(0, 0, 0);  // Center
+    for (int i = 0; i <= 32; i++) {
+        float angle = (i * 2.0f * M_PI) / 32.0f;
+        glVertex3f(std::cos(angle) * collisionRadius, std::sin(angle) * collisionRadius, 0);
+    }
+    glEnd();
+    
+    // Inner circle - actual standing point (darker, smaller)
+    float standingRadius = 5.0f;  // Small radius where player actually stands
+    glColor4f(0.0f, 0.0f, 0.0f, 0.7f);
+    glBegin(GL_TRIANGLE_FAN);
+    glVertex3f(0, 0, 0.1f);  // Slightly above to render on top
+    for (int i = 0; i <= 32; i++) {
+        float angle = (i * 2.0f * M_PI) / 32.0f;
+        glVertex3f(std::cos(angle) * standingRadius, std::sin(angle) * standingRadius, 0.1f);
+    }
+    glEnd();
+    
+    glDisable(GL_BLEND);
+    glEnable(GL_DEPTH_TEST);
     
     glPopMatrix();
 }

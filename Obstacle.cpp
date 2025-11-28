@@ -22,33 +22,99 @@ bool Box::checkCollision(float px, float py, float pz, float radius) const {
 }
 
 ObstacleCourse::ObstacleCourse() {
-    // Create a jump and run course with wider surfaces
+    // Extended parkour course along the EDGE of the grid (negative Z side)
+    // Grid is 800x800 (-400 to +400), parkour runs along Z = -300 to -350
     
-    // Starting platform
-    obstacles.push_back(Box(-200, -10, 0, 120, 10, 120, 0.5f, 0.5f, 0.5f));
+    float courseZ = -320;  // Center line of the parkour course
     
-    // Low barriers to jump over - wider tops
-    obstacles.push_back(Box(-50, 0, 0, 30, 30, 60, 0.8f, 0.3f, 0.3f));
-    obstacles.push_back(Box(50, 0, 0, 30, 35, 60, 0.8f, 0.3f, 0.3f));
-    obstacles.push_back(Box(150, 0, 0, 30, 40, 60, 0.8f, 0.3f, 0.3f));
+    // ==================== SECTION 1: Starting Area ====================
+    // Starting platform at the edge
+    obstacles.push_back(Box(-350, -10, courseZ, 100, 10, 80, 0.5f, 0.5f, 0.5f));
     
-    // Walls to go around - wider passages
-    obstacles.push_back(Box(250, 0, -60, 30, 60, 50, 0.3f, 0.6f, 0.8f));
-    obstacles.push_back(Box(250, 0, 60, 30, 60, 50, 0.3f, 0.6f, 0.8f));
+    // ==================== SECTION 2: Basic Jumps ====================
+    // Low barriers to jump over - progressively higher
+    obstacles.push_back(Box(-220, 0, courseZ, 30, 25, 60, 0.8f, 0.3f, 0.3f));
+    obstacles.push_back(Box(-150, 0, courseZ, 30, 30, 60, 0.8f, 0.3f, 0.3f));
+    obstacles.push_back(Box(-80, 0, courseZ, 30, 35, 60, 0.8f, 0.3f, 0.3f));
+    obstacles.push_back(Box(-10, 0, courseZ, 30, 40, 60, 0.8f, 0.3f, 0.3f));
     
-    // Low tunnel to crouch through - wider
-    obstacles.push_back(Box(350, 60, 0, 80, 20, 100, 0.6f, 0.8f, 0.3f));
+    // ==================== SECTION 3: Crouch Tunnel ====================
+    // Low tunnel - must crouch to pass
+    obstacles.push_back(Box(80, 55, courseZ, 100, 30, 80, 0.6f, 0.8f, 0.3f));
     
-    // More jumps - bigger landing areas
-    obstacles.push_back(Box(500, 0, 30, 35, 45, 60, 0.8f, 0.3f, 0.3f));
-    obstacles.push_back(Box(600, 0, -30, 35, 50, 60, 0.8f, 0.3f, 0.3f));
+    // ==================== SECTION 4: Zigzag Walls ====================
+    // Walls to weave through
+    obstacles.push_back(Box(200, 0, courseZ - 35, 25, 70, 40, 0.3f, 0.6f, 0.8f));
+    obstacles.push_back(Box(260, 0, courseZ + 35, 25, 70, 40, 0.3f, 0.6f, 0.8f));
+    obstacles.push_back(Box(320, 0, courseZ - 35, 25, 70, 40, 0.3f, 0.6f, 0.8f));
+    obstacles.push_back(Box(380, 0, courseZ + 35, 25, 70, 40, 0.3f, 0.6f, 0.8f));
     
-    // Narrow passage - slightly wider
-    obstacles.push_back(Box(700, 0, -80, 100, 80, 30, 0.7f, 0.4f, 0.9f));
-    obstacles.push_back(Box(700, 0, 80, 100, 80, 30, 0.7f, 0.4f, 0.9f));
+    // ==================== SECTION 5: Platform Jumps ====================
+    // Elevated platforms to jump across
+    obstacles.push_back(Box(480, 0, courseZ - 30, 50, 40, 50, 0.9f, 0.5f, 0.2f));
+    obstacles.push_back(Box(560, 0, courseZ + 30, 50, 50, 50, 0.9f, 0.5f, 0.2f));
+    obstacles.push_back(Box(640, 0, courseZ - 30, 50, 60, 50, 0.9f, 0.5f, 0.2f));
+    obstacles.push_back(Box(720, 0, courseZ, 50, 70, 50, 0.9f, 0.5f, 0.2f));
     
-    // Final platform
-    obstacles.push_back(Box(850, -10, 0, 120, 10, 120, 0.3f, 0.8f, 0.3f));
+    // ==================== SECTION 6: Double Crouch ====================
+    // Two crouch sections back to back
+    obstacles.push_back(Box(820, 55, courseZ - 25, 80, 30, 50, 0.6f, 0.8f, 0.3f));
+    obstacles.push_back(Box(920, 55, courseZ + 25, 80, 30, 50, 0.6f, 0.8f, 0.3f));
+    
+    // ==================== SECTION 7: Narrow Corridor ====================
+    // Tight passage with walls on both sides
+    obstacles.push_back(Box(1050, 0, courseZ - 50, 120, 90, 25, 0.7f, 0.4f, 0.9f));
+    obstacles.push_back(Box(1050, 0, courseZ + 50, 120, 90, 25, 0.7f, 0.4f, 0.9f));
+    
+    // ==================== SECTION 8: Staircase Up ====================
+    // Rising platforms like stairs
+    obstacles.push_back(Box(1180, 0, courseZ, 40, 20, 60, 0.4f, 0.7f, 0.7f));
+    obstacles.push_back(Box(1240, 0, courseZ, 40, 40, 60, 0.4f, 0.7f, 0.7f));
+    obstacles.push_back(Box(1300, 0, courseZ, 40, 60, 60, 0.4f, 0.7f, 0.7f));
+    obstacles.push_back(Box(1360, 0, courseZ, 40, 80, 60, 0.4f, 0.7f, 0.7f));
+    
+    // ==================== SECTION 9: High Platform Run ====================
+    // Long elevated platform
+    obstacles.push_back(Box(1480, 0, courseZ, 200, 80, 70, 0.5f, 0.3f, 0.7f));
+    
+    // ==================== SECTION 10: Jump Down + Obstacles ====================
+    // Landing zone after drop
+    obstacles.push_back(Box(1650, -10, courseZ, 80, 10, 80, 0.5f, 0.5f, 0.5f));
+    
+    // More jump obstacles
+    obstacles.push_back(Box(1750, 0, courseZ, 30, 45, 60, 0.8f, 0.3f, 0.3f));
+    obstacles.push_back(Box(1830, 0, courseZ, 30, 50, 60, 0.8f, 0.3f, 0.3f));
+    obstacles.push_back(Box(1910, 0, courseZ, 30, 55, 60, 0.8f, 0.3f, 0.3f));
+    
+    // ==================== SECTION 11: Crouch + Jump Combo ====================
+    // Alternating crouch and jump sections
+    obstacles.push_back(Box(2020, 55, courseZ, 60, 30, 70, 0.6f, 0.8f, 0.3f));  // Crouch
+    obstacles.push_back(Box(2110, 0, courseZ, 30, 40, 60, 0.8f, 0.3f, 0.3f));   // Jump
+    obstacles.push_back(Box(2180, 55, courseZ, 60, 30, 70, 0.6f, 0.8f, 0.3f));  // Crouch
+    obstacles.push_back(Box(2270, 0, courseZ, 30, 45, 60, 0.8f, 0.3f, 0.3f));   // Jump
+    
+    // ==================== SECTION 12: Final Gauntlet ====================
+    // Tight zigzag with crouch ceiling
+    obstacles.push_back(Box(2380, 0, courseZ - 40, 20, 80, 30, 0.3f, 0.6f, 0.8f));
+    obstacles.push_back(Box(2380, 55, courseZ + 10, 60, 30, 60, 0.6f, 0.8f, 0.3f));
+    obstacles.push_back(Box(2460, 0, courseZ + 40, 20, 80, 30, 0.3f, 0.6f, 0.8f));
+    obstacles.push_back(Box(2460, 55, courseZ - 10, 60, 30, 60, 0.6f, 0.8f, 0.3f));
+    
+    // ==================== FINISH ====================
+    // Victory platform
+    goalBox = Box(2600, -10, courseZ, 150, 10, 100, 0.2f, 0.9f, 0.2f);
+    obstacles.push_back(goalBox);
+}
+
+bool ObstacleCourse::isOnGoal(float x, float y, float z) {
+    float halfW = goalBox.width / 2;
+    float halfD = goalBox.depth / 2;
+    float topY = goalBox.y + goalBox.height;
+    
+    // Check if player is standing on top of the goal platform
+    return (x >= goalBox.x - halfW && x <= goalBox.x + halfW &&
+            z >= goalBox.z - halfD && z <= goalBox.z + halfD &&
+            y >= topY && y <= topY + 50);  // Within 50 units above the goal
 }
 
 void ObstacleCourse::render() {
@@ -68,18 +134,20 @@ bool ObstacleCourse::checkCollision(float x, float y, float z, float radius) {
 
 float ObstacleCourse::getFloorHeight(float x, float z, float currentY) {
     float maxFloor = 0.0f;
+    float standingMargin = 10.0f;  // Extra margin for standing on edges
     
     for (const auto& box : obstacles) {
-        float halfW = box.width / 2;
-        float halfD = box.depth / 2;
+        float halfW = box.width / 2 + standingMargin;
+        float halfD = box.depth / 2 + standingMargin;
         
-        // Check if player is above this box
+        // Check if player is within the XZ bounds of this box (with margin)
         if (x >= box.x - halfW && x <= box.x + halfW &&
             z >= box.z - halfD && z <= box.z + halfD) {
             
             float topY = box.y + box.height;
-            // Only consider if we're close to the top and it's higher than current max
-            if (topY > maxFloor && currentY >= topY - 5) {
+            
+            // Only count this as floor if player is above it (not inside/below)
+            if (currentY >= topY && topY > maxFloor) {
                 maxFloor = topY;
             }
         }
