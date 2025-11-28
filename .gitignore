@@ -1,4 +1,5 @@
 # Build directories
+.cache/
 build/
 bin/
 obj/
