@@ -178,10 +178,11 @@ bool ObstacleCourse::isOnGoal(float x, float y, float z) {
     float halfD = goalBox.depth / 2;
     float topY = goalBox.y + goalBox.height;
     
-    // Check if player is standing on top of the goal platform
+    // Check if player is on or above the goal platform (within reasonable height)
+    // Player Y is the foot position, but in third person the reported Y includes offset
     return (x >= goalBox.x - halfW && x <= goalBox.x + halfW &&
             z >= goalBox.z - halfD && z <= goalBox.z + halfD &&
-            y >= topY && y <= topY + 50);  // Within 50 units above the goal
+            y >= topY - 10 && y <= topY + 150);  // More forgiving height range
 }
 
 int ObstacleCourse::isOnCheckpoint(float x, float y, float z) {

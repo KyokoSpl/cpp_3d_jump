@@ -35,6 +35,7 @@ float deltaTime = 0.0f;
 void setup();
 void draw();
 void keyCallback(GLFWwindow* window, int key, int scancode, int action, int mods);
+void charCallback(GLFWwindow* window, unsigned int codepoint);
 void cursorPosCallback(GLFWwindow* window, double xpos, double ypos);
 void scrollCallback(GLFWwindow* window, double xoffset, double yoffset);
 void mouseButtonCallback(GLFWwindow* window, int button, int action, int mods);
@@ -86,6 +87,7 @@ int main(int argc, char* argv[]) {
     glfwMakeContextCurrent(window);
     
     glfwSetKeyCallback(window, keyCallback);
+    glfwSetCharCallback(window, charCallback);
     glfwSetCursorPosCallback(window, cursorPosCallback);
     glfwSetScrollCallback(window, scrollCallback);
     glfwSetMouseButtonCallback(window, mouseButtonCallback);
@@ -130,6 +132,16 @@ int main(int argc, char* argv[]) {
             userInput->resetStats();  // Reset timer and death count
             projectiles->reset();
             menu->resetFlags();
+        }
+        if (menu->shouldResetToStart) {
+            // Reset after completion screen
+            userInput->resetPosition();
+            userInput->resetStats();
+            projectiles->reset();
+            // Reset input states to prevent residual movement
+            w = s = a = d = false;
+            shift = false;
+            menu->shouldResetToStart = false;
         }
         if (menu->shouldToggleFullscreen) {
             toggleFullscreen();
@@ -253,13 +265,24 @@ void draw() {
             projectiles->reset();
         }
         
-        // Check if player reached the goal
-        if (userInput->isTimerRunning() && obstacles->isOnGoal(
+        // Check if player reached the goal (trigger even if timer not running)
+        if (!userInput->isTimerFinished() && obstacles->isOnGoal(
                 userInput->getPlayerX(),
                 userInput->getPlayerY(),
                 userInput->getPlayerZ())) {
-            userInput->stopTimer();  // Auto-stop timer at goal
+            userInput->stopTimer();  // Stop timer at goal
+            // Show completion screen
+            menu->showCompletion(userInput->getTimer(), userInput->getDeathCount());
+            glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_NORMAL);
         }
+    }
+    
+    // Update completion countdown
+    menu->updateCompletion(deltaTime);
+    
+    // Check if completion is done and reset cursor
+    if (menu->shouldResetToStart) {
+        glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
     }
     
     // Render game world
@@ -287,6 +310,12 @@ void draw() {
 }
 
 void keyCallback(GLFWwindow* window, int key, int scancode, int action, int mods) {
+    // During completion screen, only handle specific keys
+    if (menu->getState() == MenuState::COMPLETION) {
+        menu->handleKey(key, action);
+        return;
+    }
+    
     // Toggle menu with Escape
     if (key == GLFW_KEY_ESCAPE && action == GLFW_PRESS) {
         if (menu->isOpen()) {
@@ -354,6 +383,13 @@ void keyCallback(GLFWwindow* window, int key, int scancode, int action, int mods
         }
         if (key == GLFW_KEY_E) userInput->setWallRunKey(false);  // Release wall run
     }
+}
+
+void charCallback(GLFWwindow* window, unsigned int codepoint) {
+    (void)window;  // Unused
+    
+    // Forward character input to menu for name entry
+    menu->handleCharInput(codepoint);
 }
 
 void cursorPosCallback(GLFWwindow* window, double xpos, double ypos) {

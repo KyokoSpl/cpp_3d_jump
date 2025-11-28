@@ -103,25 +103,16 @@ struct MovingPlatform {
 
 ---
 
-#### 4. Best Time Tracking
-**What**: Save and display best completion time.
+#### 4. ~~Best Time Tracking~~ ✅ IMPLEMENTED
+**Status**: This feature has been implemented as a full **Leaderboard System**!
 
-**Starting Point**:
-```cpp
-// In Menu.h
-float bestTime = 0.0f;
-bool hasBestTime = false;
+The game now includes:
+- **Completion screen** that appears when reaching the goal
+- **Name entry** with character input
+- **JSON leaderboard** saving player name, time, deaths, and timestamp
+- **Python viewer** (`leaderboard.py`) to display top 100 scores
 
-// When course completed
-if (!hasBestTime || currentTime < bestTime) {
-    bestTime = currentTime;
-    hasBestTime = true;
-    saveBestTime();  // Write to file
-}
-
-// In settings file
-file << "bestTime=" << bestTime << "\n";
-```
+See the implementation in `Menu.cpp` (`showCompletion()`, `saveLeaderboard()`) and `main.cpp` (goal detection).
 
 ---
 

@@ -16,7 +16,8 @@ enum class MenuState {
     DIFFICULTY_SETTINGS,// Difficulty selection
     CUSTOM_SETTINGS,    // Custom difficulty sliders
     KEYBIND_WAITING,    // Waiting for key press to rebind
-    HELP                // Help/controls display
+    HELP,               // Help/controls display
+    COMPLETION          // Course completion screen with name entry
 };
 ```
 
@@ -30,6 +31,7 @@ NONE ←→ PAUSE ←→ SETTINGS ←→ CONTROLS_SETTINGS
               DIFFICULTY_SETTINGS ←→ CUSTOM_SETTINGS
               
 NONE ←→ HELP (H key shortcut)
+NONE → COMPLETION → NONE (triggered when reaching goal)
 ```
 
 ## 2D Rendering Setup
@@ -519,6 +521,162 @@ void Menu::renderHUD(int windowWidth, int windowHeight, float timer, int deaths,
     glColor3f(0.4f, 0.4f, 0.4f);
     drawText(padding, padding + 10, "[H] Help", 0.3f);
 }
+```
+
+## Completion Screen & Leaderboard
+
+When the player reaches the goal, a completion screen appears with name entry and leaderboard saving.
+
+### Triggering Completion
+
+In `main.cpp`, goal detection triggers the completion screen:
+
+```cpp
+// Check if player reached goal
+if (obstacles->isOnGoal(playerX, playerY, playerZ) && !userInput->isTimerFinished()) {
+    userInput->stopTimer();
+    menu->showCompletion(userInput->getTimer(), userInput->getDeathCount());
+}
+```
+
+### Completion Screen State
+
+```cpp
+void Menu::showCompletion(float time, int deaths) {
+    state = MenuState::COMPLETION;
+    completionTime = time;
+    completionDeaths = deaths;
+    completionCountdown = 10.0f;  // 10 second countdown
+    completionSaved = false;
+    playerName = "";              // Clear previous name
+    
+    // Show cursor for name input
+    glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_NORMAL);
+}
+```
+
+### Character Input for Name Entry
+
+GLFW provides a character callback for text input:
+
+```cpp
+// In main.cpp - Register callback
+glfwSetCharCallback(window, charCallback);
+
+void charCallback(GLFWwindow* window, unsigned int codepoint) {
+    if (menu->getState() == MenuState::COMPLETION) {
+        menu->handleCharInput(codepoint);
+    }
+}
+
+// In Menu.cpp
+void Menu::handleCharInput(unsigned int codepoint) {
+    if (state != MenuState::COMPLETION || completionSaved) return;
+    
+    // Only allow printable ASCII characters, max 20 chars
+    if (codepoint >= 32 && codepoint < 127 && playerName.length() < 20) {
+        playerName += static_cast<char>(codepoint);
+    }
+}
+```
+
+### Saving to Leaderboard (JSON)
+
+```cpp
+void Menu::saveLeaderboard() {
+    if (completionSaved || playerName.empty()) return;
+    
+    std::string name = playerName;
+    
+    // Read existing leaderboard
+    std::ifstream inFile("leaderboard.json");
+    std::string content = "";
+    if (inFile.is_open()) {
+        std::stringstream buffer;
+        buffer << inFile.rdbuf();
+        content = buffer.str();
+        inFile.close();
+    }
+    
+    // Create new entry
+    std::stringstream newEntry;
+    newEntry << "    {\n"
+             << "      \"name\": \"" << name << "\",\n"
+             << "      \"time\": " << completionTime << ",\n"
+             << "      \"deaths\": " << completionDeaths << ",\n"
+             << "      \"timestamp\": " << std::time(nullptr) << "\n"
+             << "    }";
+    
+    // Write updated JSON
+    std::ofstream outFile("leaderboard.json");
+    outFile << "{\n  \"entries\": [\n";
+    // ... append entries
+    outFile << "  ]\n}\n";
+    outFile.close();
+    
+    completionSaved = true;
+}
+```
+
+### Countdown and Auto-Reset
+
+```cpp
+void Menu::updateCompletion(float deltaTime) {
+    if (state != MenuState::COMPLETION) return;
+    
+    completionCountdown -= deltaTime;
+    
+    if (completionCountdown <= 0.0f) {
+        // Auto-save if name entered
+        if (!completionSaved && !playerName.empty()) {
+            saveLeaderboard();
+        }
+        // Signal main loop to reset player position
+        shouldResetToStart = true;
+        state = MenuState::NONE;
+    }
+}
+```
+
+### Input State Reset on Respawn
+
+When respawning after completion, movement keys must be reset to prevent residual movement:
+
+```cpp
+// In main.cpp
+if (menu->shouldResetToStart) {
+    userInput->resetPosition();
+    userInput->resetStats();
+    projectiles->reset();
+    // Reset input states to prevent residual movement
+    w = s = a = d = false;
+    shift = false;
+    menu->shouldResetToStart = false;
+}
+```
+
+### Python Leaderboard Viewer
+
+A companion script `leaderboard.py` displays the saved scores:
+
+```python
+import json
+
+def main():
+    with open("build/leaderboard.json", "r") as f:
+        data = json.load(f)
+    
+    entries = sorted(data.get("entries", []), key=lambda x: x["time"])
+    
+    print("🏆 LEADERBOARD 🏆")
+    for i, entry in enumerate(entries[:100], 1):
+        medal = ["🥇", "🥈", "🥉"][i-1] if i <= 3 else ""
+        minutes = int(entry["time"]) // 60
+        seconds = entry["time"] % 60
+        print(f"{i:3}  {entry['name']:12} {minutes:02}:{seconds:05.2f} {entry['deaths']:3} deaths {medal}")
+
+if __name__ == "__main__":
+    main()
 ```
 
 ## Next Steps

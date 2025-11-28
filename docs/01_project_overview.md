@@ -9,6 +9,8 @@ This is a 3D parkour platformer game where you control a stick figure character 
 - **Parkour obstacles** like barriers, tunnels, and platforms
 - **Checkpoints** and **death zones**
 - **Timer system** for speedrunning
+- **Completion screen** with name entry and leaderboard
+- **Leaderboard system** saving times to JSON
 - **Settings menu** with customizable controls
 
 ## How Games Work (The Game Loop)

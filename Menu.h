@@ -81,7 +81,8 @@ enum class MenuState {
     DIFFICULTY_SETTINGS,
     CUSTOM_SETTINGS,
     KEYBIND_WAITING,      // Waiting for key press to rebind
-    HELP                  // Help/controls display
+    HELP,                 // Help/controls display
+    COMPLETION            // Course completed - name entry
 };
 
 // Character info for font rendering
@@ -109,6 +110,13 @@ private:
     float applyFeedbackTimer; // Timer for showing "Settings Applied!" feedback
     std::string popupMessage;  // Current popup message
     bool popupIsGreen;         // true = green (reset), false = blue (apply)
+    
+    // Completion screen
+    std::string playerName;           // Name being entered
+    float completionTime;             // Final time achieved
+    int completionDeaths;             // Deaths during run
+    float completionCountdown;        // 10 second countdown
+    bool completionSaved;             // Has the score been saved
     
     Difficulty currentDifficulty;
     GameSettings settings;
@@ -195,16 +203,25 @@ public:
     void loadSettings();
     void saveSettings();
     
+    // Completion screen
+    void showCompletion(float time, int deaths);
+    void updateCompletion(float deltaTime);
+    bool isCompletionDone() const;
+    void handleCharInput(unsigned int codepoint);
+    void saveLeaderboard();
+    
     bool shouldRestart;
     bool shouldQuit;
     bool shouldToggleFullscreen;
     bool shouldUpdateVSync;
+    bool shouldResetToStart;  // Reset player to start after completion
     
     void resetFlags() { 
         shouldRestart = false; 
         shouldQuit = false; 
         shouldToggleFullscreen = false;
         shouldUpdateVSync = false;
+        shouldResetToStart = false;
     }
 };
 

@@ -39,8 +39,10 @@ cpp_3d_jump/
 ├── Grid.cpp/h        # Ground grid rendering
 ├── Projectile.cpp/h  # Projectile system (optional feature)
 ├── miniaudio.h       # Single-header audio library
+├── leaderboard.py    # Python script to view leaderboard
 ├── CMakeLists.txt    # Build configuration
 ├── asset/            # Game assets (fonts, sounds)
+├── build/            # Build output (includes leaderboard.json)
 └── docs/             # This documentation
 ```
 
@@ -52,7 +54,7 @@ cpp_3d_jump/
 - **OpenGL**: Legacy immediate mode rendering, transformations
 - **Physics**: Gravity, collision detection, player movement
 - **Input Handling**: Keyboard, mouse, event callbacks
-- **File I/O**: Saving and loading settings
+- **File I/O**: Saving and loading settings, JSON leaderboard
 - **Audio**: Cross-platform sound playback
 
 ## Prerequisites

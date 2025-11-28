@@ -7,6 +7,7 @@
 #include <cstring>
 #include <fstream>
 #include <sstream>
+#include <iostream>
 #include <unistd.h>
 #include <sys/wait.h>
 
@@ -309,10 +310,18 @@ Menu::Menu() {
     draggingSlider = -1;
     windowRef = nullptr;
     
+    // Completion screen
+    playerName = "";
+    completionTime = 0.0f;
+    completionDeaths = 0;
+    completionCountdown = 0.0f;
+    completionSaved = false;
+    
     shouldRestart = false;
     shouldQuit = false;
     shouldToggleFullscreen = false;
     shouldUpdateVSync = false;
+    shouldResetToStart = false;
     
     screenWidth = 1920;
     screenHeight = 1080;
@@ -1105,6 +1114,100 @@ void Menu::render(int windowWidth, int windowHeight) {
         float btnY = panelY + 25;
         drawButton(buttonX, btnY, buttonWidth, buttonHeight, "Back (ESC)", true);
     }
+    else if (state == MenuState::COMPLETION) {
+        panelHeight = 400.0f;
+        panelY = (windowHeight - panelHeight) / 2.0f;
+        
+        // Redraw panel with new dimensions
+        glColor4f(0.05f, 0.15f, 0.05f, 0.95f);  // Dark green tint
+        glBegin(GL_QUADS);
+        glVertex2f(panelX, panelY); glVertex2f(panelX + panelWidth, panelY);
+        glVertex2f(panelX + panelWidth, panelY + panelHeight); glVertex2f(panelX, panelY + panelHeight);
+        glEnd();
+        
+        glColor3f(0.2f, 0.8f, 0.2f);  // Green border
+        glLineWidth(3.0f);
+        glBegin(GL_LINE_LOOP);
+        glVertex2f(panelX, panelY); glVertex2f(panelX + panelWidth, panelY);
+        glVertex2f(panelX + panelWidth, panelY + panelHeight); glVertex2f(panelX, panelY + panelHeight);
+        glEnd();
+        
+        // Congrats title
+        glColor3f(0.2f, 1.0f, 0.2f);
+        float titleW = getTextWidth("CONGRATULATIONS!", 0.8f);
+        drawText(panelX + (panelWidth - titleW) / 2.0f, panelY + panelHeight - 60, "CONGRATULATIONS!", 0.8f);
+        
+        // Subtitle
+        glColor3f(0.8f, 1.0f, 0.8f);
+        float subW = getTextWidth("Course Completed!", 0.5f);
+        drawText(panelX + (panelWidth - subW) / 2.0f, panelY + panelHeight - 100, "Course Completed!", 0.5f);
+        
+        // Time display
+        int minutes = (int)(completionTime / 60.0f);
+        int seconds = (int)completionTime % 60;
+        int milliseconds = (int)((completionTime - (int)completionTime) * 100);
+        
+        char timeStr[64];
+        snprintf(timeStr, sizeof(timeStr), "Time: %02d:%02d.%02d", minutes, seconds, milliseconds);
+        glColor3f(1.0f, 1.0f, 1.0f);
+        float timeW = getTextWidth(timeStr, 0.55f);
+        drawText(panelX + (panelWidth - timeW) / 2.0f, panelY + panelHeight - 150, timeStr, 0.55f);
+        
+        // Deaths display
+        char deathStr[32];
+        snprintf(deathStr, sizeof(deathStr), "Deaths: %d", completionDeaths);
+        glColor3f(1.0f, 0.6f, 0.6f);
+        float deathW = getTextWidth(deathStr, 0.45f);
+        drawText(panelX + (panelWidth - deathW) / 2.0f, panelY + panelHeight - 185, deathStr, 0.45f);
+        
+        // Name input label
+        glColor3f(0.9f, 0.9f, 0.2f);
+        float labelW = getTextWidth("Enter your name:", 0.45f);
+        drawText(panelX + (panelWidth - labelW) / 2.0f, panelY + panelHeight - 235, "Enter your name:", 0.45f);
+        
+        // Name input box
+        float boxWidth = 300.0f;
+        float boxHeight = 45.0f;
+        float boxX = panelX + (panelWidth - boxWidth) / 2.0f;
+        float boxY = panelY + panelHeight - 290;
+        
+        // Box background
+        glColor4f(0.15f, 0.15f, 0.15f, 0.9f);
+        glBegin(GL_QUADS);
+        glVertex2f(boxX, boxY); glVertex2f(boxX + boxWidth, boxY);
+        glVertex2f(boxX + boxWidth, boxY + boxHeight); glVertex2f(boxX, boxY + boxHeight);
+        glEnd();
+        
+        // Box border
+        glColor3f(0.5f, 0.8f, 0.5f);
+        glLineWidth(2.0f);
+        glBegin(GL_LINE_LOOP);
+        glVertex2f(boxX, boxY); glVertex2f(boxX + boxWidth, boxY);
+        glVertex2f(boxX + boxWidth, boxY + boxHeight); glVertex2f(boxX, boxY + boxHeight);
+        glEnd();
+        
+        // Name text with cursor
+        std::string displayName = playerName;
+        // Add blinking cursor
+        if (((int)(completionCountdown * 2)) % 2 == 0) {
+            displayName += "_";
+        }
+        glColor3f(1.0f, 1.0f, 1.0f);
+        drawText(boxX + 15, boxY + 12, displayName, 0.45f);
+        
+        // Countdown display
+        glColor3f(0.6f, 0.6f, 0.6f);
+        char countdownStr[64];
+        int countSecs = (int)completionCountdown + 1;
+        snprintf(countdownStr, sizeof(countdownStr), "Restarting in %d seconds...", countSecs);
+        float countW = getTextWidth(countdownStr, 0.35f);
+        drawText(panelX + (panelWidth - countW) / 2.0f, panelY + 40, countdownStr, 0.35f);
+        
+        // Press Enter hint
+        glColor3f(0.5f, 0.8f, 0.5f);
+        float hintW = getTextWidth("Press ENTER to save early", 0.35f);
+        drawText(panelX + (panelWidth - hintW) / 2.0f, panelY + 70, "Press ENTER to save early", 0.35f);
+    }
     
     glDisable(GL_BLEND);
     glEnable(GL_DEPTH_TEST);
@@ -1352,6 +1455,26 @@ void Menu::renderHUD(int windowWidth, int windowHeight, float timer, int deaths,
 
 void Menu::handleKey(int key, int action) {
     if (action != GLFW_PRESS) return;
+    
+    // Handle completion screen input
+    if (state == MenuState::COMPLETION) {
+        if (key == GLFW_KEY_BACKSPACE) {
+            if (!playerName.empty()) {
+                playerName.pop_back();
+            }
+        }
+        else if (key == GLFW_KEY_ENTER) {
+            // Save early and reset
+            if (!completionSaved) {
+                saveLeaderboard();
+                completionSaved = true;
+            }
+            state = MenuState::NONE;
+            shouldResetToStart = true;
+        }
+        // Ignore other keys in completion screen
+        return;
+    }
     
     // Handle keybind waiting
     if (state == MenuState::KEYBIND_WAITING || waitingForKeybind >= 0) {
@@ -1829,4 +1952,126 @@ void Menu::handleMouseMove(double x, double y) {
         value = std::max(0.0f, std::min(1.0f, (float)(x - buttonX) / sliderWidth));
         jumpSlider = value;
     }
+}
+
+// ==================== Completion Screen ====================
+
+void Menu::showCompletion(float time, int deaths) {
+    state = MenuState::COMPLETION;
+    completionTime = time;
+    completionDeaths = deaths;
+    completionCountdown = 10.0f;
+    completionSaved = false;
+    playerName = "";
+    
+    playPopupSound();
+}
+
+void Menu::updateCompletion(float deltaTime) {
+    if (state != MenuState::COMPLETION) return;
+    
+    completionCountdown -= deltaTime;
+    
+    if (completionCountdown <= 0) {
+        // Time's up - save and reset
+        if (!completionSaved) {
+            saveLeaderboard();
+            completionSaved = true;
+        }
+        state = MenuState::NONE;
+        shouldResetToStart = true;
+    }
+}
+
+bool Menu::isCompletionDone() const {
+    return state == MenuState::COMPLETION && completionCountdown <= 0;
+}
+
+void Menu::handleCharInput(unsigned int codepoint) {
+    if (state != MenuState::COMPLETION) return;
+    
+    // Only accept printable ASCII characters
+    if (codepoint >= 32 && codepoint < 127) {
+        // Limit name length
+        if (playerName.length() < 20) {
+            playerName += (char)codepoint;
+        }
+    }
+}
+
+void Menu::saveLeaderboard() {
+    if (completionSaved) return;
+    
+    // Use a default name if empty
+    std::string name = playerName.empty() ? "Anonymous" : playerName;
+    
+    // Read existing leaderboard
+    std::string filename = "leaderboard.json";
+    std::ifstream inFile(filename);
+    std::string content = "";
+    
+    if (inFile.is_open()) {
+        std::stringstream buffer;
+        buffer << inFile.rdbuf();
+        content = buffer.str();
+        inFile.close();
+    }
+    
+    // Simple JSON writing (manual to avoid dependencies)
+    std::ofstream outFile(filename);
+    if (!outFile.is_open()) {
+        std::cerr << "Failed to open leaderboard file for writing!" << std::endl;
+        return;
+    }
+    
+    // Parse existing entries or start fresh
+    std::vector<std::string> entries;
+    
+    if (!content.empty() && content.find('[') != std::string::npos) {
+        // Extract existing entries (simple parsing)
+        size_t start = content.find('[');
+        size_t end = content.rfind(']');
+        if (start != std::string::npos && end != std::string::npos) {
+            std::string arrayContent = content.substr(start + 1, end - start - 1);
+            
+            // Find each object { ... }
+            size_t objStart = 0;
+            while ((objStart = arrayContent.find('{', objStart)) != std::string::npos) {
+                size_t objEnd = arrayContent.find('}', objStart);
+                if (objEnd != std::string::npos) {
+                    entries.push_back(arrayContent.substr(objStart, objEnd - objStart + 1));
+                    objStart = objEnd + 1;
+                } else {
+                    break;
+                }
+            }
+        }
+    }
+    
+    // Add new entry
+    char newEntry[256];
+    snprintf(newEntry, sizeof(newEntry), 
+             "    {\n"
+             "        \"name\": \"%s\",\n"
+             "        \"time\": %.3f,\n"
+             "        \"deaths\": %d\n"
+             "    }",
+             name.c_str(), completionTime, completionDeaths);
+    entries.push_back(newEntry);
+    
+    // Write JSON array
+    outFile << "[\n";
+    for (size_t i = 0; i < entries.size(); i++) {
+        outFile << entries[i];
+        if (i < entries.size() - 1) {
+            outFile << ",";
+        }
+        outFile << "\n";
+    }
+    outFile << "]\n";
+    
+    outFile.close();
+    completionSaved = true;
+    
+    std::cout << "Leaderboard saved: " << name << " - " << completionTime << "s, " << completionDeaths << " deaths" << std::endl;
 }
