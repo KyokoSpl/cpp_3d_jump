@@ -64,11 +64,23 @@ UserInput::UserInput() {
     sensitivity = 0.003f;  // Default mouse sensitivity
     fov = 60.0f;  // Default field of view
     
+    // Wall running
+    isWallRunning = false;
+    wallRunTimer = 0.0f;
+    maxWallRunTime = 1.5f;  // Can wall run for 1.5 seconds
+    wallRunSide = 0;
+    wallRunKeyHeld = false;
+    
     // Timer and stats
     timer = 0.0f;
     timerRunning = false;
     timerFinished = false;
     deathCount = 0;
+    
+    // Checkpoint system
+    lastCheckpoint = -1;
+    checkpointPopupTimer = 0.0f;
+    checkpointMessage = "";
 }
 
 Vector3 UserInput::getViewVector() {
@@ -153,8 +165,54 @@ void UserInput::update(int windowWidth, int windowHeight, ObstacleCourse* course
     float lerpFactor = 1.0f - std::pow(1.0f - 0.2f, timeScale);  // Frame-rate independent lerp
     playerHeight += (targetHeight - playerHeight) * lerpFactor;
     
-    // Apply gravity (scaled by delta time)
-    yVel += gravity * timeScale;
+    // Wall running logic
+    if (wallRunKeyHeld && !grounded && course) {
+        // Check for walls on left and right
+        Vector3 v = getViewVector();
+        Vector3 forwardV(v.x, 0, v.z);
+        forwardV.normalize();
+        Vector3 rightV = forwardV.cross(Vector3(0, 1, 0));
+        rightV.normalize();
+        
+        float wallCheckDist = collisionRadius + 15.0f;
+        bool leftWall = course->checkCollision(playerX - rightV.x * wallCheckDist, playerY, 
+                                               playerZ - rightV.z * wallCheckDist, 5.0f);
+        bool rightWall = course->checkCollision(playerX + rightV.x * wallCheckDist, playerY,
+                                                playerZ + rightV.z * wallCheckDist, 5.0f);
+        
+        if ((leftWall || rightWall) && wallRunTimer < maxWallRunTime && yVel <= 0) {
+            if (!isWallRunning) {
+                isWallRunning = true;
+                wallRunSide = rightWall ? 1 : -1;
+            }
+            wallRunTimer += deltaTime;
+            
+            // Slow descent while wall running
+            yVel = -2.0f;
+            
+            // Move forward along wall
+            float wallRunSpeed = SPEED * 1.2f * timeScale;
+            playerX += forwardV.x * wallRunSpeed;
+            playerZ += forwardV.z * wallRunSpeed;
+        } else {
+            isWallRunning = false;
+        }
+    } else {
+        isWallRunning = false;
+    }
+    
+    // Reset wall run when grounded
+    if (grounded) {
+        wallRunTimer = 0.0f;
+        isWallRunning = false;
+    }
+    
+    // Apply gravity (scaled by delta time) - reduced during wall run
+    if (isWallRunning) {
+        yVel = std::max(yVel, -2.0f);  // Limit fall speed during wall run
+    } else {
+        yVel += gravity * timeScale;
+    }
     
     // Try to move vertically (velocity also scaled by delta time)
     float newY = playerY + yVel * timeScale;
@@ -224,7 +282,29 @@ void UserInput::update(int windowWidth, int windowHeight, ObstacleCourse* course
     // Skip respawn in dev mode
     if (!devMode && (playerY < deathY || (offGrid && playerY < spawnY - 10))) {
         std::cout << "RESPAWNING!" << std::endl;
-        respawn();
+        respawn(course);
+    }
+    
+    // Check for death zone (spike plates)
+    if (!devMode && course && course->isOnDeathZone(playerX, playerY, playerZ)) {
+        std::cout << "HIT DEATH ZONE!" << std::endl;
+        respawn(course);
+    }
+    
+    // Check for checkpoint
+    if (course) {
+        int checkpoint = course->isOnCheckpoint(playerX, playerY, playerZ);
+        if (checkpoint != -1 && checkpoint > lastCheckpoint) {
+            lastCheckpoint = checkpoint;
+            checkpointPopupTimer = 2.0f;  // Show popup for 2 seconds
+            checkpointMessage = "Checkpoint " + std::to_string(checkpoint + 1) + " Reached!";
+            std::cout << checkpointMessage << std::endl;
+        }
+    }
+    
+    // Update checkpoint popup timer
+    if (checkpointPopupTimer > 0) {
+        checkpointPopupTimer -= deltaTime;
     }
     
     // Set up camera - first person if zoomed in close, otherwise third person
@@ -304,14 +384,48 @@ void UserInput::update(int windowWidth, int windowHeight, ObstacleCourse* course
 }
 
 void UserInput::jump() {
+    // Wall jump - jump off wall while wall running
+    if (isWallRunning) {
+        // Jump away from wall
+        Vector3 v = getViewVector();
+        Vector3 forwardV(v.x, 0, v.z);
+        forwardV.normalize();
+        Vector3 rightV = forwardV.cross(Vector3(0, 1, 0));
+        rightV.normalize();
+        
+        // Push away from wall and up
+        yVel = jumpForce * 0.9f;
+        isWallRunning = false;
+        wallRunTimer = 0.0f;
+        grounded = false;
+        return;
+    }
+    
+    // Normal jump
     if (grounded && !isCrouching) {
         yVel = jumpForce;
         grounded = false;
     }
 }
 
+void UserInput::crouchJump() {
+    // Crouch jump - lower height but can be done while crouching
+    if (grounded && isCrouching) {
+        yVel = jumpForce * 0.6f;  // 60% of normal jump height
+        grounded = false;
+    }
+}
+
 void UserInput::setCrouch(bool crouch) {
     isCrouching = crouch;
+}
+
+void UserInput::setWallRunKey(bool held) {
+    wallRunKeyHeld = held;
+    if (!held) {
+        isWallRunning = false;
+        wallRunTimer = 0.0f;
+    }
 }
 
 void UserInput::adjustCameraDistance(float delta) {
@@ -335,10 +449,15 @@ void UserInput::resetPosition() {
     grounded = false;
 }
 
-void UserInput::respawn() {
-    playerX = spawnX;
-    playerY = spawnY;
-    playerZ = spawnZ;
+void UserInput::respawn(ObstacleCourse* course) {
+    // Respawn at last checkpoint if available
+    if (lastCheckpoint >= 0 && course) {
+        course->getCheckpointPosition(lastCheckpoint, playerX, playerY, playerZ);
+    } else {
+        playerX = spawnX;
+        playerY = spawnY;
+        playerZ = spawnZ;
+    }
     yVel = 0;
     grounded = false;
     deathCount++;  // Increment death counter
@@ -360,6 +479,9 @@ void UserInput::resetStats() {
     timerRunning = false;
     timerFinished = false;
     deathCount = 0;
+    lastCheckpoint = -1;
+    checkpointPopupTimer = 0.0f;
+    checkpointMessage = "";
 }
 
 void UserInput::render() {
@@ -372,57 +494,292 @@ void UserInput::render() {
     }
 }
 
+// Helper function to draw a smooth 3D capsule/limb (cylinder with rounded ends)
+static void drawLimb(float x1, float y1, float z1, float x2, float y2, float z2, float radius, int segments = 12) {
+    float dx = x2 - x1;
+    float dy = y2 - y1;
+    float dz = z2 - z1;
+    float length = std::sqrt(dx*dx + dy*dy + dz*dz);
+    if (length < 0.001f) return;
+    
+    // Normalize direction
+    dx /= length; dy /= length; dz /= length;
+    
+    // Find perpendicular vectors
+    float px, py, pz;
+    if (std::abs(dy) < 0.9f) {
+        px = -dz; py = 0; pz = dx;
+    } else {
+        px = 1; py = 0; pz = 0;
+    }
+    float pl = std::sqrt(px*px + py*py + pz*pz);
+    px /= pl; py /= pl; pz /= pl;
+    
+    // Second perpendicular
+    float qx = dy * pz - dz * py;
+    float qy = dz * px - dx * pz;
+    float qz = dx * py - dy * px;
+    
+    // Draw cylinder body
+    glBegin(GL_QUAD_STRIP);
+    for (int i = 0; i <= segments; i++) {
+        float angle = (i * 2.0f * M_PI) / segments;
+        float c = std::cos(angle);
+        float s = std::sin(angle);
+        
+        float nx = px * c + qx * s;
+        float ny = py * c + qy * s;
+        float nz = pz * c + qz * s;
+        
+        glNormal3f(nx, ny, nz);
+        glVertex3f(x1 + nx * radius, y1 + ny * radius, z1 + nz * radius);
+        glVertex3f(x2 + nx * radius, y2 + ny * radius, z2 + nz * radius);
+    }
+    glEnd();
+    
+    // Draw hemispherical caps for smooth ends
+    int capSegs = 6;
+    // Cap at start (x1, y1, z1)
+    for (int i = 0; i < capSegs; i++) {
+        float lat0 = M_PI * 0.5f * (float)i / capSegs;
+        float lat1 = M_PI * 0.5f * (float)(i + 1) / capSegs;
+        
+        glBegin(GL_QUAD_STRIP);
+        for (int j = 0; j <= segments; j++) {
+            float lng = 2 * M_PI * (float)j / segments;
+            float cx = std::cos(lng);
+            float cz = std::sin(lng);
+            
+            for (int k = 0; k < 2; k++) {
+                float lat = (k == 0) ? lat0 : lat1;
+                float r = std::cos(lat) * radius;
+                float offset = -std::sin(lat) * radius;
+                
+                float nx = px * cx * std::cos(lat) + qx * cz * std::cos(lat) - dx * std::sin(lat);
+                float ny = py * cx * std::cos(lat) + qy * cz * std::cos(lat) - dy * std::sin(lat);
+                float nz = pz * cx * std::cos(lat) + qz * cz * std::cos(lat) - dz * std::sin(lat);
+                
+                glNormal3f(nx, ny, nz);
+                glVertex3f(x1 + (px * cx + qx * cz) * r + dx * offset,
+                          y1 + (py * cx + qy * cz) * r + dy * offset,
+                          z1 + (pz * cx + qz * cz) * r + dz * offset);
+            }
+        }
+        glEnd();
+    }
+    
+    // Cap at end (x2, y2, z2)
+    for (int i = 0; i < capSegs; i++) {
+        float lat0 = M_PI * 0.5f * (float)i / capSegs;
+        float lat1 = M_PI * 0.5f * (float)(i + 1) / capSegs;
+        
+        glBegin(GL_QUAD_STRIP);
+        for (int j = 0; j <= segments; j++) {
+            float lng = 2 * M_PI * (float)j / segments;
+            float cx = std::cos(lng);
+            float cz = std::sin(lng);
+            
+            for (int k = 0; k < 2; k++) {
+                float lat = (k == 0) ? lat0 : lat1;
+                float r = std::cos(lat) * radius;
+                float offset = std::sin(lat) * radius;
+                
+                float nx = px * cx * std::cos(lat) + qx * cz * std::cos(lat) + dx * std::sin(lat);
+                float ny = py * cx * std::cos(lat) + qy * cz * std::cos(lat) + dy * std::sin(lat);
+                float nz = pz * cx * std::cos(lat) + qz * cz * std::cos(lat) + dz * std::sin(lat);
+                
+                glNormal3f(nx, ny, nz);
+                glVertex3f(x2 + (px * cx + qx * cz) * r + dx * offset,
+                          y2 + (py * cx + qy * cz) * r + dy * offset,
+                          z2 + (pz * cx + qz * cz) * r + dz * offset);
+            }
+        }
+        glEnd();
+    }
+}
+
+// Helper function to draw a smooth 3D sphere
+static void drawSphere(float x, float y, float z, float radius, int segments = 12) {
+    for (int i = 0; i < segments; i++) {
+        float lat0 = M_PI * (-0.5f + (float)i / segments);
+        float lat1 = M_PI * (-0.5f + (float)(i + 1) / segments);
+        float y0 = std::sin(lat0);
+        float y1 = std::sin(lat1);
+        float r0 = std::cos(lat0);
+        float r1 = std::cos(lat1);
+        
+        glBegin(GL_QUAD_STRIP);
+        for (int j = 0; j <= segments; j++) {
+            float lng = 2 * M_PI * (float)j / segments;
+            float cx = std::cos(lng);
+            float cz = std::sin(lng);
+            
+            glNormal3f(cx * r0, y0, cz * r0);
+            glVertex3f(x + radius * cx * r0, y + radius * y0, z + radius * cz * r0);
+            glNormal3f(cx * r1, y1, cz * r1);
+            glVertex3f(x + radius * cx * r1, y + radius * y1, z + radius * cz * r1);
+        }
+        glEnd();
+    }
+}
+
+// Draw smooth tapered torso with rounded top
+static void drawTorso(float x, float bottomY, float topY, float bottomRadius, float topRadius, int segments = 12) {
+    float height = topY - bottomY;
+    int rings = 8;
+    
+    for (int i = 0; i < rings; i++) {
+        float t0 = (float)i / rings;
+        float t1 = (float)(i + 1) / rings;
+        float y0 = bottomY + height * t0;
+        float y1 = bottomY + height * t1;
+        float r0 = bottomRadius + (topRadius - bottomRadius) * t0;
+        float r1 = bottomRadius + (topRadius - bottomRadius) * t1;
+        
+        glBegin(GL_QUAD_STRIP);
+        for (int j = 0; j <= segments; j++) {
+            float angle = 2 * M_PI * (float)j / segments;
+            float cx = std::cos(angle);
+            float cz = std::sin(angle);
+            
+            glNormal3f(cx, 0.1f, cz);
+            glVertex3f(x + cx * r0, y0, cz * r0);
+            glVertex3f(x + cx * r1, y1, cz * r1);
+        }
+        glEnd();
+    }
+    
+    // Rounded dome cap on top
+    int capSegs = 6;
+    float capHeight = topRadius * 0.4f; // How much the dome rises
+    for (int i = 0; i < capSegs; i++) {
+        float lat0 = M_PI * 0.5f * (float)i / capSegs;
+        float lat1 = M_PI * 0.5f * (float)(i + 1) / capSegs;
+        
+        glBegin(GL_QUAD_STRIP);
+        for (int j = 0; j <= segments; j++) {
+            float angle = 2 * M_PI * (float)j / segments;
+            float cx = std::cos(angle);
+            float cz = std::sin(angle);
+            
+            for (int k = 0; k < 2; k++) {
+                float lat = (k == 0) ? lat0 : lat1;
+                float r = std::cos(lat) * topRadius;
+                float yOffset = std::sin(lat) * capHeight;
+                
+                glNormal3f(cx * std::cos(lat), std::sin(lat), cz * std::cos(lat));
+                glVertex3f(x + cx * r, topY + yOffset, cz * r);
+            }
+        }
+        glEnd();
+    }
+}
+
 void UserInput::drawStickFigure() {
     glPushMatrix();
     
-    // Position at player location - centered on ground
+    // Position at player location
     glTranslatef(playerX, playerY - playerHeight, playerZ);
     
-    // Billboard rotation - make stick figure face camera
-    // Rotate around Y axis to face camera direction
-    float billboardAngle = std::atan2(-getViewVector().x, -getViewVector().z) * 180.0f / M_PI;
-    glRotatef(billboardAngle, 0, 1, 0);
+    // Rotate to face camera direction
+    float faceAngle = std::atan2(-getViewVector().x, -getViewVector().z) * 180.0f / M_PI;
+    glRotatef(faceAngle, 0, 1, 0);
     
-    float bodyHeight = playerHeight * 0.6f;
-    float headRadius = playerHeight * 0.1f;  // Smaller head
-    float legLength = playerHeight * 0.4f;
-    float armLength = playerHeight * 0.3f;   // Slimmer arms
+    // Enable smooth shading and lighting
+    glShadeModel(GL_SMOOTH);
+    glEnable(GL_LIGHTING);
+    glEnable(GL_LIGHT0);
+    glEnable(GL_COLOR_MATERIAL);
+    glColorMaterial(GL_FRONT_AND_BACK, GL_AMBIENT_AND_DIFFUSE);
     
-    // Set color
-    glColor3f(1.0f, 1.0f, 1.0f);
-    glLineWidth(2.0f);  // Thinner lines
+    // Soft lighting
+    float lightPos[] = {50.0f, 150.0f, 100.0f, 0.0f};
+    float lightAmb[] = {0.4f, 0.4f, 0.4f, 1.0f};
+    float lightDif[] = {0.6f, 0.6f, 0.6f, 1.0f};
+    glLightfv(GL_LIGHT0, GL_POSITION, lightPos);
+    glLightfv(GL_LIGHT0, GL_AMBIENT, lightAmb);
+    glLightfv(GL_LIGHT0, GL_DIFFUSE, lightDif);
     
-    glBegin(GL_LINES);
+    // Body proportions
+    float scale = playerHeight / 70.0f;
+    float legLength = 32.0f * scale;
+    float torsoLength = 28.0f * scale;
+    float headRadius = 7.0f * scale;
+    float torsoRadiusBottom = 7.0f * scale;
+    float torsoRadiusTop = 8.0f * scale;
+    float legRadius = 3.5f * scale;
+    float armRadius = 2.8f * scale;
+    float armLength = 26.0f * scale;
+    float shoulderWidth = 9.0f * scale;
+    float hipWidth = 4.0f * scale;
     
-    // Body - starts from ground at legs
-    glVertex3f(0, legLength, 0);
-    glVertex3f(0, legLength + bodyHeight, 0);
+    // Single smooth color - warm gray
+    glColor3f(0.75f, 0.72f, 0.70f);
     
-    // Head (circle approximation)
-    float headY = legLength + bodyHeight + headRadius;
-    for (int i = 0; i < 16; i++) {
-        float angle1 = (i * 2.0f * M_PI) / 16.0f;
-        float angle2 = ((i + 1) * 2.0f * M_PI) / 16.0f;
-        glVertex3f(std::cos(angle1) * headRadius, headY + std::sin(angle1) * headRadius, 0);
-        glVertex3f(std::cos(angle2) * headRadius, headY + std::sin(angle2) * headRadius, 0);
-    }
+    // ===== LEGS (smooth, continuous) =====
+    float footY = 2.0f * scale;
+    float kneeY = legLength * 0.45f;
+    float hipY = legLength;
     
-    // Arms
-    float armY = legLength + bodyHeight * 0.8f;
-    float armAngle = isCrouching ? 0.5f : 0.3f;
-    glVertex3f(0, armY, 0);
-    glVertex3f(-armLength * std::cos(armAngle), armY - armLength * std::sin(armAngle), 0);
-    glVertex3f(0, armY, 0);
-    glVertex3f(armLength * std::cos(armAngle), armY - armLength * std::sin(armAngle), 0);
+    // Left leg - thigh and calf as one smooth limb each
+    drawLimb(-hipWidth, footY, 2.0f * scale, -hipWidth * 0.8f, kneeY, 0, legRadius);
+    drawLimb(-hipWidth * 0.8f, kneeY, 0, -hipWidth * 0.5f, hipY, 0, legRadius * 1.1f);
     
-    // Legs - go from leg junction to ground
-    float legSpread = playerHeight * 0.08f;  // Much narrower stance
-    glVertex3f(0, legLength, 0);
-    glVertex3f(-legSpread, 0, 0);
-    glVertex3f(0, legLength, 0);
-    glVertex3f(legSpread, 0, 0);
+    // Right leg
+    drawLimb(hipWidth, footY, 2.0f * scale, hipWidth * 0.8f, kneeY, 0, legRadius);
+    drawLimb(hipWidth * 0.8f, kneeY, 0, hipWidth * 0.5f, hipY, 0, legRadius * 1.1f);
     
-    glEnd();
+    // Feet (rounded)
+    drawSphere(-hipWidth, footY, 3.0f * scale, legRadius * 1.3f, 8);
+    drawSphere(hipWidth, footY, 3.0f * scale, legRadius * 1.3f, 8);
+    
+    // ===== TORSO (smooth tapered) =====
+    float torsoBottom = hipY - 2.0f * scale;
+    float torsoTop = hipY + torsoLength;
+    drawTorso(0, torsoBottom, torsoTop, torsoRadiusBottom, torsoRadiusTop);
+    
+    // Hip area - smooth sphere to blend legs into torso
+    drawSphere(0, torsoBottom + 2.0f * scale, 0, torsoRadiusBottom * 1.1f, 10);
+    
+    // ===== ARMS (hanging naturally at sides) =====
+    float shoulderY = torsoTop - 4.0f * scale;
+    float elbowY = shoulderY - armLength * 0.5f;
+    float handY = shoulderY - armLength * 0.95f;
+    
+    // Left arm - slight natural bend
+    drawLimb(-shoulderWidth, shoulderY, 0, 
+             -shoulderWidth - 2.0f * scale, elbowY, 3.0f * scale, armRadius);
+    drawLimb(-shoulderWidth - 2.0f * scale, elbowY, 3.0f * scale,
+             -shoulderWidth - 1.0f * scale, handY, 5.0f * scale, armRadius * 0.9f);
+    
+    // Right arm
+    drawLimb(shoulderWidth, shoulderY, 0,
+             shoulderWidth + 2.0f * scale, elbowY, 3.0f * scale, armRadius);
+    drawLimb(shoulderWidth + 2.0f * scale, elbowY, 3.0f * scale,
+             shoulderWidth + 1.0f * scale, handY, 5.0f * scale, armRadius * 0.9f);
+    
+    // Hands (smooth spheres)
+    drawSphere(-shoulderWidth - 1.0f * scale, handY, 5.0f * scale, armRadius * 1.4f, 8);
+    drawSphere(shoulderWidth + 1.0f * scale, handY, 5.0f * scale, armRadius * 1.4f, 8);
+    
+    // Shoulder spheres - larger and positioned to bridge arm and torso
+    float shoulderSphereRadius = armRadius * 2.2f;
+    drawSphere(-shoulderWidth + 2.0f * scale, shoulderY + 0.5f * scale, 0, shoulderSphereRadius, 10);
+    drawSphere(shoulderWidth - 2.0f * scale, shoulderY + 0.5f * scale, 0, shoulderSphereRadius, 10);
+    
+    // ===== NECK & HEAD =====
+    float neckY = torsoTop;
+    float neckTopY = torsoTop + 5.0f * scale;
+    drawLimb(0, neckY, 0, 0, neckTopY, 0, armRadius * 1.0f);
+    
+    // Head (smooth sphere)
+    float headY = neckTopY + headRadius * 0.7f;
+    drawSphere(0, headY, 0, headRadius, 16);
+    
+    // Disable lighting
+    glDisable(GL_LIGHTING);
+    glDisable(GL_LIGHT0);
+    glDisable(GL_COLOR_MATERIAL);
     
     glPopMatrix();
 }

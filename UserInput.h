@@ -1,6 +1,8 @@
 #ifndef USERINPUT_H
 #define USERINPUT_H
 
+#include <string>
+
 struct Vector3 {
     float x, y, z;
     
@@ -39,11 +41,23 @@ private:
     float sensitivity;              // Mouse sensitivity
     float fov;                      // Field of view in degrees
     
+    // Wall running
+    bool isWallRunning;
+    float wallRunTimer;             // How long player has been wall running
+    float maxWallRunTime;           // Maximum wall run duration
+    int wallRunSide;                // -1 = left wall, 1 = right wall, 0 = none
+    bool wallRunKeyHeld;            // Is E key being held
+    
     // Timer and stats
     float timer;                    // Current run time in seconds
     bool timerRunning;              // Is timer currently running
     bool timerFinished;             // Has the timer been stopped by reaching goal
     int deathCount;                 // Number of deaths this session
+    
+    // Checkpoint system
+    int lastCheckpoint;             // Last checkpoint reached (-1 = none)
+    float checkpointPopupTimer;     // Timer for showing checkpoint popup
+    std::string checkpointMessage;  // Message to show
 
     Vector3 getViewVector();
     void drawStickFigure();
@@ -56,7 +70,9 @@ public:
     void update(int windowWidth, int windowHeight, ObstacleCourse* course, class Grid* grid, float deltaTime);
     void render();
     void jump();
+    void crouchJump();              // Jump while crouching (lower but faster)
     void setCrouch(bool crouch);
+    void setWallRunKey(bool held);  // Set wall run key state
     void adjustCameraDistance(float delta);
     void setPhysics(float speed, float grav, float jump);
     void setDevMode(bool enabled) { devMode = enabled; }
@@ -67,7 +83,7 @@ public:
     void stopTimer();               // Stop timer (when reaching goal)
     void resetPosition();
     void resetStats();              // Reset timer and death count
-    void respawn();                 // Respawn and increment death count
+    void respawn(ObstacleCourse* course = nullptr);  // Respawn and increment death count
     float getPlayerX() const { return playerX; }
     float getPlayerY() const { return playerY; }
     float getPlayerZ() const { return playerZ; }
@@ -78,6 +94,9 @@ public:
     bool isTimerRunning() const { return timerRunning; }
     bool isTimerFinished() const { return timerFinished; }
     int getDeathCount() const { return deathCount; }
+    float getCheckpointPopupTimer() const { return checkpointPopupTimer; }
+    const std::string& getCheckpointMessage() const { return checkpointMessage; }
+    bool getIsWallRunning() const { return isWallRunning; }
 };
 
 #endif // USERINPUT_H

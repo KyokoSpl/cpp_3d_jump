@@ -249,7 +249,7 @@ void draw() {
                 userInput->getPlayerHeight(),
                 userInput->getIsCrouching())) {
             // Player hit! Respawn (counts as death)
-            userInput->respawn();
+            userInput->respawn(obstacles);
             projectiles->reset();
         }
         
@@ -264,9 +264,16 @@ void draw() {
     
     // Render game world
     grid->update();
-    obstacles->render();
+    obstacles->render(deltaTime);
     projectiles->render();
     userInput->render();
+    
+    // Render checkpoint popup if active
+    if (userInput->getCheckpointPopupTimer() > 0) {
+        menu->renderCheckpointPopup(windowWidth, windowHeight, 
+                                     userInput->getCheckpointMessage(),
+                                     userInput->getCheckpointPopupTimer());
+    }
     
     // Render HUD (timer and death count) when menu is closed
     if (!menu->isOpen()) {
@@ -317,16 +324,35 @@ void keyCallback(GLFWwindow* window, int key, int scancode, int action, int mods
         if (key == controls.keyLeft) a = true;
         if (key == controls.keyBackward) s = true;
         if (key == controls.keyRight) d = true;
-        if (key == controls.keyCrouch) shift = true;
-        if (key == controls.keyJump) userInput->jump();
+        if (key == controls.keyCrouch) {
+            shift = true;
+            userInput->setCrouch(true);  // Immediately crouch
+        }
+        if (key == controls.keyJump) {
+            if (shift && userInput->getIsCrouching()) {
+                userInput->crouchJump();  // Crouch jump when crouching + space
+            } else {
+                userInput->jump();
+            }
+        }
         if (key == controls.keyTimer) userInput->toggleTimer();
         if (key == controls.keyReset) userInput->resetStats();
+        if (key == GLFW_KEY_E) userInput->setWallRunKey(true);  // Wall run key
+        if (key == controls.keyHelp) {  // Help menu
+            menu->open();
+            menu->showHelp();
+            glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_NORMAL);
+        }
     } else if (action == GLFW_RELEASE) {
         if (key == controls.keyForward) w = false;
         if (key == controls.keyLeft) a = false;
         if (key == controls.keyBackward) s = false;
         if (key == controls.keyRight) d = false;
-        if (key == controls.keyCrouch) shift = false;
+        if (key == controls.keyCrouch) {
+            shift = false;
+            userInput->setCrouch(false);  // Immediately uncrouch
+        }
+        if (key == GLFW_KEY_E) userInput->setWallRunKey(false);  // Release wall run
     }
 }
 

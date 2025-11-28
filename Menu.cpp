@@ -10,20 +10,43 @@
 #include <unistd.h>
 #include <sys/wait.h>
 
-// Generate the popup beep WAV file
+// miniaudio for cross-platform audio playback
+#define MINIAUDIO_IMPLEMENTATION
+#include "miniaudio.h"
+
+// Audio engine (initialized once)
+static ma_engine* audioEngine = nullptr;
+static bool audioInitialized = false;
+
+// Sound file path (in same directory as settings.cfg)
+static const char* SOUND_FILE = "asset/popup_beep.wav";
+
+// Generate the popup beep WAV file if it doesn't exist
 // Sound parameters - customize these values:
 //   frequency: 200-2000 Hz recommended (440=A4, 523=C5, 659=E5, 880=A5)
 //   duration: 50-200 ms for a short "blip"
 static void generatePopupSound() {
+    // Check if file already exists
+    FILE* check = fopen(SOUND_FILE, "rb");
+    if (check) {
+        fclose(check);
+        printf("[Audio] Sound file already exists: %s\n", SOUND_FILE);
+        return;
+    }
+    
+    printf("[Audio] Generating sound file: %s\n", SOUND_FILE);
+    
     const int sampleRate = 44100;
     const int duration = 100;        // milliseconds
     const float frequency = 440.0f;  // Hz - mid frequency, pleasant
     const int numSamples = sampleRate * duration / 1000;
     
-    // Create WAV file in /tmp
-    const char* tmpFile = "/tmp/popup_beep.wav";
-    FILE* f = fopen(tmpFile, "wb");
-    if (!f) return;
+    // Create WAV file in asset directory (same as other game assets)
+    FILE* f = fopen(SOUND_FILE, "wb");
+    if (!f) {
+        printf("[Audio] ERROR: Failed to create sound file: %s\n", SOUND_FILE);
+        return;
+    }
     
     // WAV header
     int dataSize = numSamples * 2;  // 16-bit = 2 bytes per sample
@@ -80,18 +103,53 @@ static void generatePopupSound() {
     
     fflush(f);
     fclose(f);
+    
+    printf("[Audio] Sound file created successfully (%d samples, %.0f Hz, %d ms)\n", 
+           numSamples, frequency, duration);
+}
+
+// Initialize audio engine at startup
+static void initPopupSound() {
+    generatePopupSound();
+    
+    // Initialize miniaudio engine
+    audioEngine = new ma_engine();
+    ma_result result = ma_engine_init(NULL, audioEngine);
+    if (result != MA_SUCCESS) {
+        printf("[Audio] ERROR: Failed to initialize audio engine (error %d)\n", result);
+        delete audioEngine;
+        audioEngine = nullptr;
+        return;
+    }
+    
+    audioInitialized = true;
+    printf("[Audio] Audio engine initialized successfully (miniaudio)\n");
+}
+
+// Cleanup audio engine
+static void cleanupAudio() {
+    if (audioEngine) {
+        ma_engine_uninit(audioEngine);
+        delete audioEngine;
+        audioEngine = nullptr;
+        audioInitialized = false;
+        printf("[Audio] Audio engine shut down\n");
+    }
 }
 
 // Play a short beep sound
 static void playPopupSound() {
-    generatePopupSound();  // Regenerate each time (allows frequency changes)
+    if (!audioInitialized || !audioEngine) {
+        printf("[Audio] WARNING: Audio not initialized, cannot play sound\n");
+        return;
+    }
     
-    // Run paplay in background
-    int ret = system("paplay /tmp/popup_beep.wav &");
-    (void)ret;  // Suppress unused warning
+    printf("[Audio] Playing sound: %s\n", SOUND_FILE);
     
-    // Small delay to ensure the shell has spawned paplay before we continue
-    usleep(10000);  // 10ms
+    ma_result result = ma_engine_play_sound(audioEngine, SOUND_FILE, NULL);
+    if (result != MA_SUCCESS) {
+        printf("[Audio] ERROR: Failed to play sound (error %d)\n", result);
+    }
 }
 
 // Initialize static member
@@ -110,6 +168,7 @@ ControlSettings::ControlSettings() {
     keyCrouch = GLFW_KEY_LEFT_SHIFT;
     keyTimer = GLFW_KEY_T;
     keyReset = GLFW_KEY_R;
+    keyHelp = GLFW_KEY_H;
 }
 
 bool ControlSettings::operator==(const ControlSettings& other) const {
@@ -122,7 +181,8 @@ bool ControlSettings::operator==(const ControlSettings& other) const {
            keyJump == other.keyJump &&
            keyCrouch == other.keyCrouch &&
            keyTimer == other.keyTimer &&
-           keyReset == other.keyReset;
+           keyReset == other.keyReset &&
+           keyHelp == other.keyHelp;
 }
 
 GraphicsSettings::GraphicsSettings() {
@@ -261,6 +321,9 @@ Menu::Menu() {
     ftLibrary = nullptr;
     ftFace = nullptr;
     
+    // Initialize popup sound file at startup
+    initPopupSound();
+    
     initFont("asset/BoldPixels.ttf");
     
     pauseButtons = {"Resume", "Restart", "Settings", "Quit"};
@@ -285,6 +348,7 @@ Menu::Menu() {
 
 Menu::~Menu() {
     cleanupFont();
+    cleanupAudio();
 }
 
 void Menu::loadSettings() {
@@ -489,6 +553,10 @@ void Menu::close() {
 void Menu::toggle() {
     if (state == MenuState::NONE) open();
     else close();
+}
+
+void Menu::showHelp() {
+    state = MenuState::HELP;
 }
 
 std::string Menu::getKeyName(int keyCode) {
@@ -839,7 +907,7 @@ void Menu::render(int windowWidth, int windowHeight) {
         float titleW = getTextWidth("CONTROLS", 0.8f);
         drawText(panelX + (panelWidth - titleW) / 2.0f, panelY + panelHeight - 60, "CONTROLS", 0.8f);
         
-        float startY = panelY + panelHeight - 110;
+        float startY = panelY + panelHeight - 100;
         float sliderWidth = 300.0f;
         float sliderX = buttonX;
         
@@ -851,22 +919,31 @@ void Menu::render(int windowWidth, int windowHeight) {
         drawText(sliderX + sliderWidth + 15, startY + 5, sensStr, 0.35f);
         
         // Toggle Crouch checkbox
-        drawCheckbox(sliderX, startY - 55, 25, "Toggle Crouch", pendingSettings.controls.toggleCrouch, controlsSelectedIndex == 1);
+        drawCheckbox(sliderX, startY - 45, 25, "Toggle Crouch", pendingSettings.controls.toggleCrouch, controlsSelectedIndex == 1);
         
-        // Keybinds
-        float keybindY = startY - 110;
-        drawKeybind(sliderX, keybindY, buttonWidth, 35, "Forward", pendingSettings.controls.keyForward, controlsSelectedIndex == 2, waitingForKeybind == 2);
-        drawKeybind(sliderX, keybindY - 45, buttonWidth, 35, "Backward", pendingSettings.controls.keyBackward, controlsSelectedIndex == 3, waitingForKeybind == 3);
-        drawKeybind(sliderX, keybindY - 90, buttonWidth, 35, "Left", pendingSettings.controls.keyLeft, controlsSelectedIndex == 4, waitingForKeybind == 4);
-        drawKeybind(sliderX, keybindY - 135, buttonWidth, 35, "Right", pendingSettings.controls.keyRight, controlsSelectedIndex == 5, waitingForKeybind == 5);
-        drawKeybind(sliderX, keybindY - 180, buttonWidth, 35, "Jump", pendingSettings.controls.keyJump, controlsSelectedIndex == 6, waitingForKeybind == 6);
-        drawKeybind(sliderX, keybindY - 225, buttonWidth, 35, "Crouch", pendingSettings.controls.keyCrouch, controlsSelectedIndex == 7, waitingForKeybind == 7);
+        // Keybinds - compact layout with two columns
+        float keybindY = startY - 95;
+        float keybindH = 30;
+        float keybindSpacing = 35;
+        float halfWidth = (buttonWidth - 10) / 2;
+        
+        // Left column
+        drawKeybind(sliderX, keybindY, halfWidth, keybindH, "Forward", pendingSettings.controls.keyForward, controlsSelectedIndex == 2, waitingForKeybind == 2);
+        drawKeybind(sliderX, keybindY - keybindSpacing, halfWidth, keybindH, "Backward", pendingSettings.controls.keyBackward, controlsSelectedIndex == 3, waitingForKeybind == 3);
+        drawKeybind(sliderX, keybindY - keybindSpacing * 2, halfWidth, keybindH, "Left", pendingSettings.controls.keyLeft, controlsSelectedIndex == 4, waitingForKeybind == 4);
+        drawKeybind(sliderX, keybindY - keybindSpacing * 3, halfWidth, keybindH, "Right", pendingSettings.controls.keyRight, controlsSelectedIndex == 5, waitingForKeybind == 5);
+        drawKeybind(sliderX, keybindY - keybindSpacing * 4, halfWidth, keybindH, "Jump", pendingSettings.controls.keyJump, controlsSelectedIndex == 6, waitingForKeybind == 6);
+        
+        // Right column
+        drawKeybind(sliderX + halfWidth + 10, keybindY, halfWidth, keybindH, "Crouch", pendingSettings.controls.keyCrouch, controlsSelectedIndex == 7, waitingForKeybind == 7);
+        drawKeybind(sliderX + halfWidth + 10, keybindY - keybindSpacing, halfWidth, keybindH, "Timer", pendingSettings.controls.keyTimer, controlsSelectedIndex == 8, waitingForKeybind == 8);
+        drawKeybind(sliderX + halfWidth + 10, keybindY - keybindSpacing * 2, halfWidth, keybindH, "Reset", pendingSettings.controls.keyReset, controlsSelectedIndex == 9, waitingForKeybind == 9);
+        drawKeybind(sliderX + halfWidth + 10, keybindY - keybindSpacing * 3, halfWidth, keybindH, "Help", pendingSettings.controls.keyHelp, controlsSelectedIndex == 10, waitingForKeybind == 10);
         
         // Back and Apply buttons at bottom
         float btnY = panelY + 25;
-        float halfWidth = (buttonWidth - 10) / 2;
-        drawButton(buttonX, btnY, halfWidth, buttonHeight, "Back", controlsSelectedIndex == 9);
-        drawButton(buttonX + halfWidth + 10, btnY, halfWidth, buttonHeight, "Apply", controlsSelectedIndex == 8);
+        drawButton(buttonX, btnY, halfWidth, buttonHeight, "Back", controlsSelectedIndex == 12);
+        drawButton(buttonX + halfWidth + 10, btnY, halfWidth, buttonHeight, "Apply", controlsSelectedIndex == 11);
     }
     else if (state == MenuState::GRAPHICS_SETTINGS) {
         glColor3f(1.0f, 1.0f, 1.0f);
@@ -972,6 +1049,62 @@ void Menu::render(int windowWidth, int windowHeight) {
         float subW = getTextWidth("(ESC to cancel)", 0.4f);
         drawText(panelX + (panelWidth - subW) / 2.0f, panelY + panelHeight / 2 - 50, "(ESC to cancel)", 0.4f);
     }
+    else if (state == MenuState::HELP) {
+        panelHeight = 550.0f;  // Taller panel for help text
+        panelY = (windowHeight - panelHeight) / 2.0f;
+        
+        // Redraw panel with new dimensions
+        glColor4f(0.1f, 0.12f, 0.15f, 0.95f);
+        glBegin(GL_QUADS);
+        glVertex2f(panelX, panelY); glVertex2f(panelX + panelWidth, panelY);
+        glVertex2f(panelX + panelWidth, panelY + panelHeight); glVertex2f(panelX, panelY + panelHeight);
+        glEnd();
+        
+        glColor3f(0.3f, 0.4f, 0.5f);
+        glLineWidth(2.0f);
+        glBegin(GL_LINE_LOOP);
+        glVertex2f(panelX, panelY); glVertex2f(panelX + panelWidth, panelY);
+        glVertex2f(panelX + panelWidth, panelY + panelHeight); glVertex2f(panelX, panelY + panelHeight);
+        glEnd();
+        
+        // Title
+        glColor3f(1.0f, 1.0f, 1.0f);
+        float titleW = getTextWidth("HELP - CONTROLS", 0.7f);
+        drawText(panelX + (panelWidth - titleW) / 2.0f, panelY + panelHeight - 55, "HELP - CONTROLS", 0.7f);
+        
+        // Help content
+        float textX = panelX + 30;
+        float textY = panelY + panelHeight - 100;
+        float lineHeight = 35.0f;
+        
+        glColor3f(0.9f, 0.7f, 0.2f);  // Gold for headers
+        drawText(textX, textY, "Movement:", 0.45f);
+        glColor3f(0.8f, 0.8f, 0.8f);  // Light gray for controls
+        drawText(textX + 20, textY - lineHeight, "WASD - Move around", 0.4f);
+        drawText(textX + 20, textY - lineHeight * 2, "Space - Jump", 0.4f);
+        drawText(textX + 20, textY - lineHeight * 3, "Shift - Crouch", 0.4f);
+        drawText(textX + 20, textY - lineHeight * 4, "Mouse - Look around", 0.4f);
+        drawText(textX + 20, textY - lineHeight * 5, "Scroll - Zoom camera in/out", 0.4f);
+        
+        glColor3f(0.9f, 0.7f, 0.2f);
+        drawText(textX, textY - lineHeight * 6.5f, "Advanced Movement:", 0.45f);
+        glColor3f(0.4f, 0.9f, 0.4f);  // Green for special moves
+        drawText(textX + 20, textY - lineHeight * 7.5f, "Shift+Space - Crouch Jump (lower but faster)", 0.4f);
+        drawText(textX + 20, textY - lineHeight * 8.5f, "E + Near Wall - Wall Run (while falling)", 0.4f);
+        drawText(textX + 20, textY - lineHeight * 9.5f, "Space (Wall Run) - Wall Jump (jump off wall)", 0.4f);
+        
+        glColor3f(0.9f, 0.7f, 0.2f);
+        drawText(textX, textY - lineHeight * 11.0f, "Other:", 0.45f);
+        glColor3f(0.8f, 0.8f, 0.8f);
+        drawText(textX + 20, textY - lineHeight * 12.0f, "T - Toggle timer", 0.4f);
+        drawText(textX + 20, textY - lineHeight * 13.0f, "R - Reset stats (timer/deaths)", 0.4f);
+        drawText(textX + 20, textY - lineHeight * 14.0f, "H - Show this help menu", 0.4f);
+        drawText(textX + 20, textY - lineHeight * 15.0f, "ESC - Pause menu", 0.4f);
+        
+        // Back button
+        float btnY = panelY + 25;
+        drawButton(buttonX, btnY, buttonWidth, buttonHeight, "Back (ESC)", true);
+    }
     
     glDisable(GL_BLEND);
     glEnable(GL_DEPTH_TEST);
@@ -1067,6 +1200,91 @@ void Menu::renderResetPopup(int windowWidth, int windowHeight) {
     glPopMatrix();
 }
 
+void Menu::renderCheckpointPopup(int windowWidth, int windowHeight, 
+                                  const std::string& message, float timer) {
+    if (timer <= 0) return;
+    
+    glMatrixMode(GL_PROJECTION);
+    glPushMatrix();
+    glLoadIdentity();
+    glOrtho(0, windowWidth, 0, windowHeight, -1, 1);
+    
+    glMatrixMode(GL_MODELVIEW);
+    glPushMatrix();
+    glLoadIdentity();
+    
+    glDisable(GL_DEPTH_TEST);
+    glEnable(GL_BLEND);
+    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+    
+    float popupWidth = 380.0f;
+    float popupHeight = 80.0f;
+    float popupX = (windowWidth - popupWidth) / 2.0f;  // Center horizontally
+    float popupY = windowHeight - popupHeight - 80.0f;  // Near top
+    
+    // Fade out effect in last 0.5 seconds
+    float alpha = timer > 0.5f ? 1.0f : timer * 2.0f;
+    
+    // Animate in from top
+    float slideIn = timer > 1.5f ? (2.0f - timer) * 2.0f : 1.0f;
+    slideIn = std::min(1.0f, std::max(0.0f, slideIn));
+    popupY = popupY + (1.0f - slideIn) * 100.0f;
+    
+    // Green theme for checkpoints
+    float bgR = 0.05f, bgG = 0.25f, bgB = 0.1f;
+    float borderR = 0.3f, borderG = 1.0f, borderB = 0.4f;
+    
+    // Popup background
+    glColor4f(bgR, bgG, bgB, 0.9f * alpha);
+    glBegin(GL_QUADS);
+    glVertex2f(popupX, popupY);
+    glVertex2f(popupX + popupWidth, popupY);
+    glVertex2f(popupX + popupWidth, popupY + popupHeight);
+    glVertex2f(popupX, popupY + popupHeight);
+    glEnd();
+    
+    // Popup border (pulsing green glow)
+    float pulse = 0.7f + 0.3f * sinf(timer * 10.0f);
+    glColor4f(borderR * pulse, borderG * pulse, borderB * pulse, alpha);
+    glLineWidth(3.0f);
+    glBegin(GL_LINE_LOOP);
+    glVertex2f(popupX, popupY);
+    glVertex2f(popupX + popupWidth, popupY);
+    glVertex2f(popupX + popupWidth, popupY + popupHeight);
+    glVertex2f(popupX, popupY + popupHeight);
+    glEnd();
+    
+    // Flag icon on left
+    glColor4f(0.3f, 1.0f, 0.5f, alpha);
+    float flagX = popupX + 30;
+    float flagY = popupY + popupHeight / 2;
+    // Flag pole
+    glLineWidth(3.0f);
+    glBegin(GL_LINES);
+    glVertex2f(flagX, flagY - 20);
+    glVertex2f(flagX, flagY + 20);
+    glEnd();
+    // Flag
+    glBegin(GL_TRIANGLES);
+    glVertex2f(flagX, flagY + 20);
+    glVertex2f(flagX + 20, flagY + 10);
+    glVertex2f(flagX, flagY);
+    glEnd();
+    
+    // Text
+    glColor4f(1.0f, 1.0f, 1.0f, alpha);
+    float textW = getTextWidth(message, 0.55f);
+    drawText(popupX + (popupWidth - textW) / 2.0f + 15, popupY + popupHeight / 2 - 12, message, 0.55f);
+    
+    glDisable(GL_BLEND);
+    glEnable(GL_DEPTH_TEST);
+    
+    glMatrixMode(GL_PROJECTION);
+    glPopMatrix();
+    glMatrixMode(GL_MODELVIEW);
+    glPopMatrix();
+}
+
 void Menu::renderHUD(int windowWidth, int windowHeight, float timer, int deaths,
                      bool timerRunning, bool timerFinished) {
     if (!fontLoaded) return;
@@ -1117,6 +1335,10 @@ void Menu::renderHUD(int windowWidth, int windowHeight, float timer, int deaths,
     float deathWidth = getTextWidth(deathStr, scale);
     drawText(windowWidth - padding - deathWidth, windowHeight - padding - 30, deathStr, scale);
     
+    // Help hint at bottom left
+    glColor3f(0.4f, 0.4f, 0.4f);
+    drawText(padding, padding + 10, "[H] Help", 0.3f);
+    
     glDisable(GL_BLEND);
     glEnable(GL_DEPTH_TEST);
     
@@ -1147,6 +1369,9 @@ void Menu::handleKey(int key, int action) {
             case 5: pendingSettings.controls.keyRight = key; break;
             case 6: pendingSettings.controls.keyJump = key; break;
             case 7: pendingSettings.controls.keyCrouch = key; break;
+            case 8: pendingSettings.controls.keyTimer = key; break;
+            case 9: pendingSettings.controls.keyReset = key; break;
+            case 10: pendingSettings.controls.keyHelp = key; break;
         }
         waitingForKeybind = -1;
         state = MenuState::CONTROLS_SETTINGS;
@@ -1185,10 +1410,10 @@ void Menu::handleKey(int key, int action) {
     }
     else if (state == MenuState::CONTROLS_SETTINGS) {
         if (key == GLFW_KEY_UP || key == GLFW_KEY_W) {
-            controlsSelectedIndex = (controlsSelectedIndex - 1 + 10) % 10;
+            controlsSelectedIndex = (controlsSelectedIndex - 1 + 13) % 13;
         }
         else if (key == GLFW_KEY_DOWN || key == GLFW_KEY_S) {
-            controlsSelectedIndex = (controlsSelectedIndex + 1) % 10;
+            controlsSelectedIndex = (controlsSelectedIndex + 1) % 13;
         }
         else if (key == GLFW_KEY_LEFT || key == GLFW_KEY_A) {
             if (controlsSelectedIndex == 0) {
@@ -1206,15 +1431,15 @@ void Menu::handleKey(int key, int action) {
             if (controlsSelectedIndex == 1) {
                 pendingSettings.controls.toggleCrouch = !pendingSettings.controls.toggleCrouch;
             }
-            else if (controlsSelectedIndex >= 2 && controlsSelectedIndex <= 7) {
+            else if (controlsSelectedIndex >= 2 && controlsSelectedIndex <= 10) {
                 waitingForKeybind = controlsSelectedIndex;
                 state = MenuState::KEYBIND_WAITING;
             }
-            else if (controlsSelectedIndex == 8) {
+            else if (controlsSelectedIndex == 11) {
                 applyPendingSettings();
                 close();  // Close entire menu
             }
-            else if (controlsSelectedIndex == 9) {
+            else if (controlsSelectedIndex == 12) {
                 state = MenuState::SETTINGS;
                 settingsSelectedIndex = 0;
             }
@@ -1311,6 +1536,12 @@ void Menu::handleKey(int key, int action) {
             else if (customSelectedIndex == 4) { state = MenuState::DIFFICULTY_SETTINGS; }
         }
         else if (key == GLFW_KEY_ESCAPE) { state = MenuState::DIFFICULTY_SETTINGS; }
+    }
+    else if (state == MenuState::HELP) {
+        // Any key closes help menu
+        if (key == GLFW_KEY_ESCAPE || key == GLFW_KEY_ENTER || key == GLFW_KEY_SPACE || key == GLFW_KEY_H) {
+            close();
+        }
     }
 }
 

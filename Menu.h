@@ -23,6 +23,7 @@ struct ControlSettings {
     int keyCrouch;
     int keyTimer;
     int keyReset;
+    int keyHelp;
     
     ControlSettings();
     bool operator==(const ControlSettings& other) const;
@@ -79,7 +80,8 @@ enum class MenuState {
     GRAPHICS_SETTINGS,
     DIFFICULTY_SETTINGS,
     CUSTOM_SETTINGS,
-    KEYBIND_WAITING      // Waiting for key press to rebind
+    KEYBIND_WAITING,      // Waiting for key press to rebind
+    HELP                  // Help/controls display
 };
 
 // Character info for font rendering
@@ -172,11 +174,14 @@ public:
     void open();
     void close();
     void toggle();
+    void showHelp();  // Show the help menu
     bool isOpen() const { return state != MenuState::NONE; }
     MenuState getState() const { return state; }
     
     void render(int windowWidth, int windowHeight);
     void renderResetPopup(int windowWidth, int windowHeight);
+    void renderCheckpointPopup(int windowWidth, int windowHeight, 
+                               const std::string& message, float timer);
     void renderHUD(int windowWidth, int windowHeight, float timer, int deaths, 
                    bool timerRunning, bool timerFinished);
     void handleKey(int key, int action);

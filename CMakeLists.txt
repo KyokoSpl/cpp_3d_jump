@@ -35,6 +35,8 @@ target_link_libraries(processing3d
     glfw
     ${FREETYPE_LIBRARIES}
     m
+    pthread
+    dl
 )
 
 # Copy asset folder to build directory
