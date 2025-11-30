@@ -1,6 +1,9 @@
 #include "UserInput.h"
 #include "Obstacle.h"
 #include "Grid.h"
+#ifdef _WIN32
+#include <windows.h>
+#endif
 #include <GL/gl.h>
 #include <cmath>
 #include <algorithm>

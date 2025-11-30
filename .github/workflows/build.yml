@@ -46,6 +46,7 @@ jobs:
       - name: Build Debian package
         run: |
           DEB_PKG_NAME="cpp-3d-jump"
+          mkdir -p packages
           mkdir -p deb-build/DEBIAN
           mkdir -p deb-build/usr/bin
           mkdir -p deb-build/usr/share/$DEB_PKG_NAME
@@ -195,7 +196,7 @@ jobs:
       - name: Setup Arch Linux
         run: |
           pacman -Syu --noconfirm
-          pacman -S --noconfirm base-devel git cmake glfw freetype2 mesa
+          pacman -S --noconfirm base-devel git cmake glfw freetype2 mesa glu
 
       - name: Checkout code
         uses: actions/checkout@v4
