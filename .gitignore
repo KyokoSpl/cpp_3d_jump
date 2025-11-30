@@ -1,9 +1,11 @@
 # Build directories
 .cache/
 build/
+build-*/
 bin/
 obj/
 out/
+packages/
 
 # Compiled object files
 *.o
@@ -28,6 +30,7 @@ out/
 *.out
 *.app
 processing3d
+cpp_3d_jump
 
 # CMake
 CMakeCache.txt

@@ -1,0 +1,342 @@
+name: Build and Release
+
+on:
+  push:
+    branches: [main]
+    tags:
+      - 'v*'
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+env:
+  PROJECT_NAME: cpp_3d_jump
+  VERSION: 1.0.0
+
+jobs:
+  # ============================================
+  # Linux Builds (Debian, RPM, AppImage)
+  # ============================================
+  build-linux:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            build-essential \
+            cmake \
+            libglfw3-dev \
+            libfreetype-dev \
+            libgl1-mesa-dev \
+            libglu1-mesa-dev \
+            rpm \
+            wget \
+            fuse \
+            libfuse2
+
+      - name: Build native binary
+        run: |
+          cmake -B build -DCMAKE_BUILD_TYPE=Release
+          cmake --build build -j$(nproc)
+
+      - name: Build Debian package
+        run: |
+          DEB_PKG_NAME="cpp-3d-jump"
+          mkdir -p deb-build/DEBIAN
+          mkdir -p deb-build/usr/bin
+          mkdir -p deb-build/usr/share/$DEB_PKG_NAME
+          mkdir -p deb-build/usr/share/applications
+          
+          cp build/${{ env.PROJECT_NAME }} deb-build/usr/bin/$DEB_PKG_NAME
+          cp -r asset deb-build/usr/share/$DEB_PKG_NAME/
+          
+          cat > deb-build/DEBIAN/control << EOF
+          Package: $DEB_PKG_NAME
+          Version: ${{ env.VERSION }}
+          Section: games
+          Priority: optional
+          Architecture: amd64
+          Depends: libglfw3, libfreetype6, libgl1
+          Maintainer: KyokoSpl
+          Description: A 3D obstacle course jump game
+           A first-person 3D obstacle course game where you jump,
+           duck, and navigate through various barriers.
+          EOF
+          
+          cat > deb-build/usr/share/applications/$DEB_PKG_NAME.desktop << EOF
+          [Desktop Entry]
+          Name=C++ 3D Jump
+          Comment=A 3D obstacle course jump game
+          Exec=$DEB_PKG_NAME
+          Terminal=false
+          Type=Application
+          Categories=Game;
+          EOF
+          
+          chmod 755 deb-build/usr/bin/$DEB_PKG_NAME
+          dpkg-deb --root-owner-group --build deb-build packages/${DEB_PKG_NAME}_${{ env.VERSION }}_amd64.deb
+
+      - name: Build RPM package
+        run: |
+          mkdir -p rpmbuild/{BUILD,RPMS,SOURCES,SPECS,SRPMS}
+          mkdir -p rpmbuild/SOURCES/${{ env.PROJECT_NAME }}-${{ env.VERSION }}
+          
+          cp build/${{ env.PROJECT_NAME }} rpmbuild/SOURCES/${{ env.PROJECT_NAME }}-${{ env.VERSION }}/
+          cp -r asset rpmbuild/SOURCES/${{ env.PROJECT_NAME }}-${{ env.VERSION }}/
+          
+          cd rpmbuild/SOURCES
+          tar -czf ${{ env.PROJECT_NAME }}-${{ env.VERSION }}.tar.gz ${{ env.PROJECT_NAME }}-${{ env.VERSION }}
+          rm -rf ${{ env.PROJECT_NAME }}-${{ env.VERSION }}
+          cd ../..
+          
+          cat > rpmbuild/SPECS/${{ env.PROJECT_NAME }}.spec << 'EOF'
+          Name:           cpp_3d_jump
+          Version:        1.0.0
+          Release:        1%{?dist}
+          Summary:        A 3D obstacle course jump game
+          License:        MIT
+          URL:            https://github.com/KyokoSpl/cpp_3d_jump
+          Source0:        %{name}-%{version}.tar.gz
+          Requires:       glfw freetype mesa-libGL
+          
+          %description
+          A first-person 3D obstacle course game where you jump,
+          duck, and navigate through various barriers.
+          
+          %prep
+          %setup -q
+          
+          %install
+          mkdir -p %{buildroot}%{_bindir}
+          mkdir -p %{buildroot}%{_datadir}/%{name}
+          install -m 755 cpp_3d_jump %{buildroot}%{_bindir}/
+          cp -r asset %{buildroot}%{_datadir}/%{name}/
+          
+          %files
+          %{_bindir}/cpp_3d_jump
+          %{_datadir}/%{name}
+          EOF
+          
+          rpmbuild --define "_topdir $(pwd)/rpmbuild" -bb rpmbuild/SPECS/${{ env.PROJECT_NAME }}.spec
+          mkdir -p packages
+          cp rpmbuild/RPMS/*/*.rpm packages/
+
+      - name: Build AppImage
+        run: |
+          mkdir -p packages
+          
+          # Download appimagetool
+          wget -q "https://github.com/AppImage/AppImageKit/releases/download/continuous/appimagetool-x86_64.AppImage" -O appimagetool
+          chmod +x appimagetool
+          
+          # Create AppDir
+          mkdir -p AppDir/usr/bin
+          mkdir -p AppDir/usr/share/${{ env.PROJECT_NAME }}
+          mkdir -p AppDir/usr/share/icons/hicolor/256x256/apps
+          
+          cp build/${{ env.PROJECT_NAME }} AppDir/usr/bin/
+          cp -r asset AppDir/usr/share/${{ env.PROJECT_NAME }}/
+          
+          # Desktop entry
+          cat > AppDir/${{ env.PROJECT_NAME }}.desktop << EOF
+          [Desktop Entry]
+          Name=C++ 3D Jump
+          Comment=A 3D obstacle course jump game
+          Exec=${{ env.PROJECT_NAME }}
+          Icon=${{ env.PROJECT_NAME }}
+          Terminal=false
+          Type=Application
+          Categories=Game;
+          EOF
+          
+          # AppRun script
+          cat > AppDir/AppRun << 'APPRUN'
+          #!/bin/bash
+          SELF=$(readlink -f "$0")
+          HERE=${SELF%/*}
+          export PATH="${HERE}/usr/bin:${PATH}"
+          export LD_LIBRARY_PATH="${HERE}/usr/lib:${LD_LIBRARY_PATH}"
+          cd "${HERE}/usr/share/cpp_3d_jump"
+          exec "${HERE}/usr/bin/cpp_3d_jump" "$@"
+          APPRUN
+          chmod +x AppDir/AppRun
+          
+          # Simple icon
+          cat > AppDir/${{ env.PROJECT_NAME }}.svg << 'ICON'
+          <svg xmlns="http://www.w3.org/2000/svg" width="256" height="256">
+            <rect width="256" height="256" fill="#4a90d9"/>
+            <text x="128" y="140" font-size="48" text-anchor="middle" fill="white">3D</text>
+          </svg>
+          ICON
+          cp AppDir/${{ env.PROJECT_NAME }}.svg AppDir/usr/share/icons/hicolor/256x256/apps/
+          
+          # Build AppImage
+          ARCH=x86_64 ./appimagetool --appimage-extract-and-run AppDir packages/${{ env.PROJECT_NAME }}-${{ env.VERSION }}-x86_64.AppImage
+
+      - name: Upload Linux artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: linux-packages
+          path: packages/*
+          retention-days: 30
+
+  # ============================================
+  # Arch Linux Build
+  # ============================================
+  build-arch:
+    runs-on: ubuntu-latest
+    container:
+      image: archlinux:latest
+    steps:
+      - name: Setup Arch Linux
+        run: |
+          pacman -Syu --noconfirm
+          pacman -S --noconfirm base-devel git cmake glfw freetype2 mesa
+
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Build package
+        run: |
+          # Create a non-root user for makepkg
+          useradd -m builder
+          chown -R builder:builder .
+          
+          mkdir -p packages
+          chown builder:builder packages
+          
+          # Create PKGBUILD
+          cat > PKGBUILD << 'EOF'
+          pkgname=cpp_3d_jump
+          pkgver=1.0.0
+          pkgrel=1
+          pkgdesc="A 3D obstacle course jump game"
+          arch=('x86_64')
+          url="https://github.com/KyokoSpl/cpp_3d_jump"
+          license=('MIT')
+          depends=('glfw' 'freetype2' 'libgl')
+          makedepends=('cmake' 'gcc')
+          
+          build() {
+              cd "$startdir"
+              cmake -B build -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=/usr
+              cmake --build build -j$(nproc)
+          }
+          
+          package() {
+              cd "$startdir"
+              install -Dm755 "build/cpp_3d_jump" "$pkgdir/usr/bin/cpp_3d_jump"
+              install -dm755 "$pkgdir/usr/share/cpp_3d_jump"
+              cp -r asset "$pkgdir/usr/share/cpp_3d_jump/"
+              
+              install -Dm644 /dev/stdin "$pkgdir/usr/share/applications/cpp_3d_jump.desktop" << DESKTOP
+          [Desktop Entry]
+          Name=C++ 3D Jump
+          Comment=A 3D obstacle course jump game
+          Exec=cpp_3d_jump
+          Terminal=false
+          Type=Application
+          Categories=Game;
+          DESKTOP
+          }
+          EOF
+          
+          chown builder:builder PKGBUILD
+          su builder -c "makepkg -sf --noconfirm"
+          mv *.pkg.tar.zst packages/
+
+      - name: Upload Arch artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: arch-package
+          path: packages/*.pkg.tar.zst
+          retention-days: 30
+
+  # ============================================
+  # Windows Build
+  # ============================================
+  build-windows:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup vcpkg
+        uses: lukka/run-vcpkg@v11
+        with:
+          vcpkgGitCommitId: '2024.11.16'
+
+      - name: Install dependencies
+        run: |
+          vcpkg install glfw3:x64-windows freetype:x64-windows
+
+      - name: Configure CMake
+        run: |
+          cmake -B build -DCMAKE_BUILD_TYPE=Release `
+            -DCMAKE_TOOLCHAIN_FILE="${env:VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake"
+
+      - name: Build
+        run: cmake --build build --config Release
+
+      - name: Create package
+        run: |
+          mkdir -p packages/windows
+          cp build/Release/${{ env.PROJECT_NAME }}.exe packages/windows/
+          cp -r asset packages/windows/
+          
+          # Create launcher batch file
+          @"
+          @echo off
+          cd /d "%~dp0"
+          ${{ env.PROJECT_NAME }}.exe
+          pause
+          "@ | Out-File -FilePath packages/windows/run_game.bat -Encoding ASCII
+          
+          # Copy required DLLs
+          cp build/Release/*.dll packages/windows/ 2>$null || true
+
+      - name: Create ZIP archive
+        run: |
+          Compress-Archive -Path packages/windows/* -DestinationPath packages/${{ env.PROJECT_NAME }}-${{ env.VERSION }}-windows-x64.zip
+
+      - name: Upload Windows artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-package
+          path: packages/*.zip
+          retention-days: 30
+
+  # ============================================
+  # Create Release (only on tags)
+  # ============================================
+  release:
+    needs: [build-linux, build-arch, build-windows]
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/v')
+    permissions:
+      contents: write
+    steps:
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: List artifacts
+        run: find artifacts -type f -ls
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v1
+        with:
+          files: |
+            artifacts/linux-packages/*
+            artifacts/arch-package/*
+            artifacts/windows-package/*
+          generate_release_notes: true
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

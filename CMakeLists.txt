@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.10)
-project(ProcessingTo3D)
+project(cpp_3d_jump)
 
 # Set C++ standard
 set(CMAKE_CXX_STANDARD 11)
@@ -42,17 +42,17 @@ set(HEADERS
 )
 
 # Add executable
-add_executable(processing3d ${SOURCES} ${HEADERS})
+add_executable(cpp_3d_jump ${SOURCES} ${HEADERS})
 
 # Include directories
-target_include_directories(processing3d PRIVATE
+target_include_directories(cpp_3d_jump PRIVATE
     ${CMAKE_SOURCE_DIR}/src
     ${OPENGL_INCLUDE_DIRS}
     ${FREETYPE_INCLUDE_DIRS}
 )
 
 # Link libraries
-target_link_libraries(processing3d
+target_link_libraries(cpp_3d_jump
     ${OPENGL_LIBRARIES}
     glfw
     ${FREETYPE_LIBRARIES}
@@ -66,5 +66,5 @@ file(COPY ${CMAKE_SOURCE_DIR}/asset DESTINATION ${CMAKE_BINARY_DIR})
 
 # Compiler flags
 if(CMAKE_COMPILER_IS_GNUCXX OR CMAKE_CXX_COMPILER_ID MATCHES "Clang")
-    target_compile_options(processing3d PRIVATE -Wall -Wextra)
+    target_compile_options(cpp_3d_jump PRIVATE -Wall -Wextra)
 endif()
