@@ -56,10 +56,16 @@ target_link_libraries(cpp_3d_jump
     ${OPENGL_LIBRARIES}
     glfw
     ${FREETYPE_LIBRARIES}
-    m
-    pthread
-    dl
 )
+
+# Platform-specific libraries
+if(UNIX)
+    target_link_libraries(cpp_3d_jump m pthread dl)
+endif()
+
+if(WIN32)
+    target_link_libraries(cpp_3d_jump opengl32 glu32)
+endif()
 
 # Copy asset folder to build directory
 file(COPY ${CMAKE_SOURCE_DIR}/asset DESTINATION ${CMAKE_BINARY_DIR})
