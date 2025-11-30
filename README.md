@@ -90,3 +90,10 @@ The sound is generated as a sine wave with harmonics and an envelope for a pleas
 - The code uses legacy OpenGL (immediate mode) for simplicity, similar to Processing's approach
 - For production code, consider using modern OpenGL with shaders and VBOs
 - Camera is implemented using manual matrix transformations to match Processing's `camera()` function
+
+
+## TODOs:
+-[ ] implement server side time saving for leader board (database and api prob)
+-[ ] fix I hate my self not possible
+-[ ] add crouching, wallriding and double jump obsticales that work
+-[ ] sprint ability with storing velocity for further jumps if jumped while sprint
