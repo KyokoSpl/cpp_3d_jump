@@ -1,6 +1,7 @@
 #include "Menu.h"
 #include "MenuAudio.h"
 #ifdef _WIN32
+#define NOMINMAX
 #include <windows.h>
 #endif
 #include <GL/gl.h>
@@ -12,6 +13,11 @@
 #include <fstream>
 #include <sstream>
 #include <iostream>
+
+// GL_CLAMP_TO_EDGE may not be defined in older GL headers
+#ifndef GL_CLAMP_TO_EDGE
+#define GL_CLAMP_TO_EDGE 0x812F
+#endif
 
 // Initialize static member
 bool Menu::devModeEnabled = false;
