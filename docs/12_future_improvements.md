@@ -33,7 +33,7 @@ void UserInput::land() {
 }
 ```
 
-**Files to modify**: `UserInput.h`, `UserInput.cpp`
+**Files to modify**: `src/UserInput.h`, `src/UserInput.cpp`
 
 ---
 
@@ -100,19 +100,6 @@ struct MovingPlatform {
 ```
 
 **Challenge**: Player must move with platform when standing on it.
-
----
-
-#### 4. ~~Best Time Tracking~~ ✅ IMPLEMENTED
-**Status**: This feature has been implemented as a full **Leaderboard System**!
-
-The game now includes:
-- **Completion screen** that appears when reaching the goal
-- **Name entry** with character input
-- **JSON leaderboard** saving player name, time, deaths, and timestamp
-- **Python viewer** (`leaderboard.py`) to display top 100 scores
-
-See the implementation in `Menu.cpp` (`showCompletion()`, `saveLeaderboard()`) and `main.cpp` (goal detection).
 
 ---
 
@@ -484,10 +471,10 @@ void main() {
 
 3. **Create a Checklist**
    ```
-   [ ] Add variables to UserInput.h
-   [ ] Implement logic in UserInput.cpp
-   [ ] Add input handling in main.cpp
-   [ ] Add UI feedback in Menu.cpp
+   [ ] Add variables to src/UserInput.h
+   [ ] Implement logic in src/UserInput.cpp
+   [ ] Add input handling in src/main.cpp
+   [ ] Add UI feedback in src/Menu.cpp
    [ ] Test basic functionality
    [ ] Handle edge cases
    [ ] Polish and tune values
@@ -524,19 +511,19 @@ Feature: Double Jump
 - Visual feedback (optional particle effect later)
 
 Files to modify:
-- UserInput.h: Add variables
-- UserInput.cpp: Add logic
-- main.cpp: No changes needed (uses existing jump key)
+- src/UserInput.h: Add variables
+- src/UserInput.cpp: Add logic
+- src/main.cpp: No changes needed (uses existing jump key)
 ```
 
-### Step 2: Add Variables (UserInput.h)
+### Step 2: Add Variables (src/UserInput.h)
 ```cpp
 // Find the jump-related variables and add:
 int jumpsRemaining;
 int maxJumps;
 ```
 
-### Step 3: Initialize in Constructor (UserInput.cpp)
+### Step 3: Initialize in Constructor (src/UserInput.cpp)
 ```cpp
 UserInput::UserInput() {
     // ... existing code ...
@@ -545,7 +532,7 @@ UserInput::UserInput() {
 }
 ```
 
-### Step 4: Modify Jump Logic (UserInput.cpp)
+### Step 4: Modify Jump Logic (src/UserInput.cpp)
 ```cpp
 void UserInput::jump() {
     // Replace the old jump check
@@ -562,7 +549,7 @@ void UserInput::jump() {
 }
 ```
 
-### Step 5: Reset on Landing (UserInput.cpp)
+### Step 5: Reset on Landing (src/UserInput.cpp)
 ```cpp
 // In the ground collision section of update()
 if (/* landed on ground */) {

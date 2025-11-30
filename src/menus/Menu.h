@@ -3,74 +3,15 @@
 
 #include <string>
 #include <vector>
-#include <functional>
 #include <map>
 
 #include <ft2build.h>
 #include FT_FREETYPE_H
 
+#include "menus/Settings.h"
+#include "menus/Leaderboard.h"
+
 struct GLFWwindow;
-
-// Control settings
-struct ControlSettings {
-    float sensitivity;
-    bool toggleCrouch;      // true = toggle, false = hold
-    int keyForward;
-    int keyBackward;
-    int keyLeft;
-    int keyRight;
-    int keyJump;
-    int keyCrouch;
-    int keyTimer;
-    int keyReset;
-    int keyHelp;
-    
-    ControlSettings();
-    bool operator==(const ControlSettings& other) const;
-    bool operator!=(const ControlSettings& other) const { return !(*this == other); }
-};
-
-// Graphics settings
-struct GraphicsSettings {
-    bool vsync;
-    float renderDistance;
-    int maxFramerate;       // 0 = unlimited
-    float guiScale;         // 0.5 to 2.0
-    bool fullscreen;
-    float fov;
-    
-    GraphicsSettings();
-    bool operator==(const GraphicsSettings& other) const;
-    bool operator!=(const GraphicsSettings& other) const { return !(*this == other); }
-};
-
-// Game difficulty settings
-struct GameSettings {
-    float speed;
-    float gravity;
-    float jumpForce;
-    bool devMode;
-    
-    // References to other settings
-    ControlSettings controls;
-    GraphicsSettings graphics;
-    
-    GameSettings();
-    bool operator==(const GameSettings& other) const;
-    bool operator!=(const GameSettings& other) const { return !(*this == other); }
-    
-    // File I/O
-    bool saveToFile(const std::string& filename);
-    bool loadFromFile(const std::string& filename);
-};
-
-enum class Difficulty {
-    PUSSY,
-    HUMAN,
-    GOAT,
-    I_HATE_MYSELF,
-    CUSTOM
-};
 
 enum class MenuState {
     NONE,
@@ -82,7 +23,8 @@ enum class MenuState {
     CUSTOM_SETTINGS,
     KEYBIND_WAITING,      // Waiting for key press to rebind
     HELP,                 // Help/controls display
-    COMPLETION            // Course completed - name entry
+    COMPLETION,           // Course completed - name entry
+    LEADERBOARD           // Leaderboard display
 };
 
 // Character info for font rendering
@@ -117,6 +59,12 @@ private:
     int completionDeaths;             // Deaths during run
     float completionCountdown;        // 10 second countdown
     bool completionSaved;             // Has the score been saved
+    
+    // Leaderboard data
+    Leaderboard leaderboard;
+    int leaderboardScroll;            // Scroll offset for large leaderboards
+    std::string leaderboardSearch;    // Search query for filtering
+    int leaderboardHighlight;         // Index of highlighted search result (-1 = none)
     
     Difficulty currentDifficulty;
     GameSettings settings;
@@ -193,8 +141,10 @@ public:
     void renderHUD(int windowWidth, int windowHeight, float timer, int deaths, 
                    bool timerRunning, bool timerFinished);
     void handleKey(int key, int action);
+    void handleKeyHeld(int key);  // For continuous key press handling
     void handleMouseClick(double x, double y, int button, int action);
     void handleMouseMove(double x, double y);
+    void handleScroll(double yoffset);  // For mouse wheel scrolling
     
     const GameSettings& getSettings() const { return settings; }
     Difficulty getDifficulty() const { return currentDifficulty; }
@@ -209,6 +159,9 @@ public:
     bool isCompletionDone() const;
     void handleCharInput(unsigned int codepoint);
     void saveLeaderboard();
+    
+    // Leaderboard menu
+    void showLeaderboard();
     
     bool shouldRestart;
     bool shouldQuit;

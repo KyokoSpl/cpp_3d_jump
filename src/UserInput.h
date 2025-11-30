@@ -28,6 +28,8 @@ private:
     float yVel;
     float gravity;
     float jumpForce;
+    int maxJumps = 2;
+    int remainingJumps = 2;
     bool grounded;
     float coyoteTimer;              // Time after leaving edge where jump is still allowed
     float playerHeight;
@@ -70,6 +72,7 @@ public:
     void update(int windowWidth, int windowHeight, ObstacleCourse* course, class Grid* grid, float deltaTime);
     void render();
     void jump();
+    void land();
     void crouchJump();              // Jump while crouching (lower but faster)
     void setCrouch(bool crouch);
     void setWallRunKey(bool held);  // Set wall run key state

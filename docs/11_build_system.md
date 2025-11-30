@@ -77,34 +77,49 @@ Windows:
 ## Defining the Executable
 
 ```cmake
-add_executable(processing3d
-    main.cpp
-    UserInput.cpp
-    Obstacle.cpp
-    Grid.cpp
-    Menu.cpp
-    Projectile.cpp
+# Source files in src/ directory
+set(SOURCES
+    src/main.cpp
+    src/Grid.cpp
+    src/UserInput.cpp
+    src/Obstacle.cpp
+    src/Menu.cpp
+    src/Projectile.cpp
 )
+
+# Header files in src/ directory
+set(HEADERS
+    src/Grid.h
+    src/UserInput.h
+    src/Obstacle.h
+    src/Menu.h
+    src/Projectile.h
+    src/miniaudio.h
+)
+
+add_executable(processing3d ${SOURCES} ${HEADERS})
 ```
 
-Lists all source files that make up the program.
+All source and header files are organized in the `src/` directory.
 
 ### Header Files
 
-Headers (.h) are NOT listed - they're included automatically via `#include`.
-CMake tracks dependencies through includes.
+While headers (.h) are typically found through `#include` directives, listing them in 
+CMakeLists.txt helps IDEs recognize them as part of the project.
 
 ## Include Directories
 
 ```cmake
 target_include_directories(processing3d PRIVATE
+    ${CMAKE_SOURCE_DIR}/src
     ${OPENGL_INCLUDE_DIR}
     ${FREETYPE_INCLUDE_DIRS}
 )
 ```
 
 Tells the compiler where to find header files:
-- `-I/usr/include/freetype2` (example)
+- `${CMAKE_SOURCE_DIR}/src` - Our own headers in src/
+- `-I/usr/include/freetype2` (example for FreeType)
 
 ### PUBLIC vs PRIVATE
 
@@ -205,12 +220,12 @@ find_package(Freetype REQUIRED)
 
 # Define executable and source files
 add_executable(processing3d
-    main.cpp
-    UserInput.cpp
-    Obstacle.cpp
-    Grid.cpp
-    Menu.cpp
-    Projectile.cpp
+    src/main.cpp
+    src/UserInput.cpp
+    src/Obstacle.cpp
+    src/Grid.cpp
+    src/Menu.cpp
+    src/Projectile.cpp
 )
 
 # Include directories for headers
@@ -330,11 +345,11 @@ target_compile_options(processing3d PRIVATE
 ```
 Source Files → Compiler → Object Files → Linker → Executable
 
-main.cpp → g++ -c → main.o ─┐
-UserInput.cpp → g++ -c → UserInput.o ─┤
-Menu.cpp → g++ -c → Menu.o ─┼→ g++ → processing3d
-Obstacle.cpp → g++ -c → Obstacle.o ─┤
-Grid.cpp → g++ -c → Grid.o ─┘
+src/main.cpp → g++ -c → main.o ─┐
+src/UserInput.cpp → g++ -c → UserInput.o ─┤
+src/Menu.cpp → g++ -c → Menu.o ─┼→ g++ → processing3d
+src/Obstacle.cpp → g++ -c → Obstacle.o ─┤
+src/Grid.cpp → g++ -c → Grid.o ─┘
 ```
 
 ### Compilation Steps

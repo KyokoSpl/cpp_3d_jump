@@ -76,14 +76,16 @@ At 30 FPS: `deltaTime = 1/30 = 0.0333`, so movement = `5 * 0.0333 * 60 = 10` per
 
 ## Files and Their Purposes
 
-### main.cpp
+All source files are organized in the `src/` directory:
+
+### src/main.cpp
 The entry point of the program. Contains:
 - Window creation with GLFW
 - Game loop
 - Input callbacks (keyboard, mouse)
 - Initialization of all game systems
 
-### UserInput.h / UserInput.cpp
+### src/UserInput.h / src/UserInput.cpp
 Handles everything about the player:
 - Position (X, Y, Z coordinates)
 - Movement (walking, jumping, crouching)
@@ -91,24 +93,35 @@ Handles everything about the player:
 - Camera (view angle, zoom)
 - Stats (timer, death count)
 
-### Obstacle.h / Obstacle.cpp
+### src/Obstacle.h / src/Obstacle.cpp
 Manages the parkour course:
 - Box structures (platforms, barriers)
 - Collision detection
 - Checkpoints and death zones
 - Rendering obstacles
 
-### Menu.h / Menu.cpp
-The pause menu and settings:
-- UI rendering (buttons, sliders, checkboxes)
-- Settings management (controls, graphics)
-- Font rendering with FreeType
-- Settings file I/O
+### src/menus/ (Menu System)
+The pause menu and settings, split into modular components:
+- **Menu.cpp/h** (630 lines) - Core menu functionality, state management, settings
+- **MenuRender.cpp** (830 lines) - All UI rendering (buttons, sliders, checkboxes, completion screen, leaderboard)
+- **MenuInput.cpp** (552 lines) - Input handling (keyboard navigation, mouse clicks, keybind waiting)
+- **MenuAudio.cpp/h** (151 lines) - Audio system initialization and popup sounds
+- **Settings.cpp/h** (145 lines) - Settings structs and file I/O
+- **Leaderboard.cpp/h** (153 lines) - Leaderboard data management and JSON parsing
 
-### Grid.h / Grid.cpp
+### src/Grid.h / src/Grid.cpp
 The ground plane:
 - Renders a grid pattern
 - Defines play area boundaries
+
+### src/Projectile.h / src/Projectile.cpp
+The projectile/arrow system:
+- Arrow launchers at specific positions
+- Arrow movement and rendering
+- Player collision detection
+
+### src/miniaudio.h
+Single-header audio library for cross-platform sound.
 
 ## Libraries Used
 

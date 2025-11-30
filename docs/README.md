@@ -32,18 +32,24 @@ make -j4
 
 ```
 cpp_3d_jump/
-├── main.cpp          # Entry point, game loop, input handling
-├── UserInput.cpp/h   # Player movement, physics, camera
-├── Obstacle.cpp/h    # Parkour course, collision detection
-├── Menu.cpp/h        # Pause menu, settings, UI rendering
-├── Grid.cpp/h        # Ground grid rendering
-├── Projectile.cpp/h  # Projectile system (optional feature)
-├── miniaudio.h       # Single-header audio library
-├── leaderboard.py    # Python script to view leaderboard
-├── CMakeLists.txt    # Build configuration
-├── asset/            # Game assets (fonts, sounds)
-├── build/            # Build output (includes leaderboard.json)
-└── docs/             # This documentation
+├── src/                       # All source code
+│   ├── main.cpp               # Entry point, game loop, input handling
+│   ├── UserInput.cpp/h        # Player movement, physics, camera
+│   ├── Obstacle.cpp/h         # Parkour course, collision detection
+│   ├── Grid.cpp/h             # Ground grid rendering
+│   ├── Projectile.cpp/h       # Projectile system (optional feature)
+│   ├── miniaudio.h            # Single-header audio library
+│   └── menus/                 # Menu system (split into modules)
+│       ├── Menu.cpp/h         # Core menu functionality
+│       ├── MenuRender.cpp     # All rendering logic (830 lines)
+│       ├── MenuInput.cpp      # Input handling (552 lines)
+│       ├── MenuAudio.cpp/h    # Audio system (151 lines)
+│       ├── Settings.cpp/h     # Settings management (145 lines)
+│       └── Leaderboard.cpp/h  # Leaderboard data (153 lines)
+├── CMakeLists.txt             # Build configuration
+├── asset/                     # Game assets (fonts, sounds)
+├── build/                     # Build output (includes leaderboard.json)
+└── docs/                      # This documentation
 ```
 
 ## Key Concepts You'll Learn

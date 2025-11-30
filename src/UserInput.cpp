@@ -256,7 +256,9 @@ void UserInput::update(int windowWidth, int windowHeight, ObstacleCourse* course
     if (playerY <= floorY + playerHeight) {
         playerY = floorY + playerHeight;
         yVel = 0;
-        grounded = true;
+        if (!grounded) {
+            land();  // Reset double jump when landing
+        }
         coyoteTimer = 0.1f;  // Reset coyote time when on ground
     } else {
         // Coyote time: allow jumping briefly after leaving edge
@@ -405,7 +407,16 @@ void UserInput::jump() {
     if (grounded && !isCrouching) {
         yVel = jumpForce;
         grounded = false;
+    // double jump
+    } 
+    if (!grounded && remainingJumps > 0) {
+        yVel = jumpForce; // Slightly reduced height for double jump
+        remainingJumps--;
     }
+}
+void UserInput::land() {
+    remainingJumps = maxJumps;
+    grounded = true;
 }
 
 void UserInput::crouchJump() {

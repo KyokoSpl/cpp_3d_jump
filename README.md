@@ -72,7 +72,7 @@ make
 
 ## Sound Customization
 
-The popup notification sound can be customized in `Menu.cpp` in the `generatePopupSound()` function:
+The popup notification sound can be customized in `src/Menu.cpp` in the `generatePopupSound()` function:
 
 - **frequency**: Any value in Hz works. Recommended range: 200-2000 Hz
   - 261.63 Hz = C4 (Middle C)

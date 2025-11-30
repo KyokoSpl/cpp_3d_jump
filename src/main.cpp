@@ -7,7 +7,7 @@
 #include "Grid.h"
 #include "UserInput.h"
 #include "Obstacle.h"
-#include "Menu.h"
+#include "menus/Menu.h"
 #include "Projectile.h"
 
 // Global variables
@@ -119,6 +119,24 @@ int main(int argc, char* argv[]) {
 
         // Poll events
         glfwPollEvents();
+        
+        // Handle continuous key presses for menu scrolling
+        if (menu->isOpen()) {
+            static double lastScrollTime = 0;
+            double scrollDelay = 0.08; // 80ms between scroll steps
+            if (currentTime - lastScrollTime > scrollDelay) {
+                if (glfwGetKey(window, GLFW_KEY_UP) == GLFW_PRESS || 
+                    glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS) {
+                    menu->handleKeyHeld(GLFW_KEY_UP);
+                    lastScrollTime = currentTime;
+                }
+                if (glfwGetKey(window, GLFW_KEY_DOWN) == GLFW_PRESS || 
+                    glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS) {
+                    menu->handleKeyHeld(GLFW_KEY_DOWN);
+                    lastScrollTime = currentTime;
+                }
+            }
+        }
 
         // Draw
         draw();
@@ -310,6 +328,9 @@ void draw() {
 }
 
 void keyCallback(GLFWwindow* window, int key, int scancode, int action, int mods) {
+    (void)scancode;  // Unused
+    (void)mods;      // Unused
+    
     // During completion screen, only handle specific keys
     if (menu->getState() == MenuState::COMPLETION) {
         menu->handleKey(key, action);
@@ -372,6 +393,11 @@ void keyCallback(GLFWwindow* window, int key, int scancode, int action, int mods
             menu->showHelp();
             glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_NORMAL);
         }
+        if (key == controls.keyLeaderboard) {  // Leaderboard menu
+            menu->open();
+            menu->showLeaderboard();
+            glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_NORMAL);
+        }
     } else if (action == GLFW_RELEASE) {
         if (key == controls.keyForward) w = false;
         if (key == controls.keyLeft) a = false;
@@ -393,6 +419,8 @@ void charCallback(GLFWwindow* window, unsigned int codepoint) {
 }
 
 void cursorPosCallback(GLFWwindow* window, double xpos, double ypos) {
+    (void)window;  // Unused
+    
     // Handle menu mouse movement
     if (menu->isOpen()) {
         menu->handleMouseMove(xpos, ypos);
@@ -418,7 +446,10 @@ void scrollCallback(GLFWwindow* window, double xoffset, double yoffset) {
     (void)window;   // Unused
     (void)xoffset;  // Unused (horizontal scroll)
     
-    if (menu->isOpen()) return;  // Don't zoom when menu is open
+    if (menu->isOpen()) {
+        menu->handleScroll(yoffset);
+        return;
+    }
     
     userInput->adjustCameraDistance(static_cast<float>(yoffset));
 }
