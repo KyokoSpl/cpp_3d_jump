@@ -7,6 +7,9 @@ obj/
 out/
 packages/
 
+# External dependencies (downloaded during build)
+src/miniaudio.h
+
 # Compiled object files
 *.o
 *.obj

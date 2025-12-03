@@ -12,11 +12,15 @@ CMake is a **build system generator**. It doesn't compile code directly - it gen
 
 This lets one CMakeLists.txt work on all platforms.
 
+## First Build Note
+
+> **Internet Required on First Build:** The project automatically downloads [miniaudio.h](https://github.com/mackron/miniaudio) (~1MB) during the CMake configure step. This single-header audio library is not included in the repository to keep GitHub from incorrectly detecting the project as C (instead of C++). Subsequent builds work offline.
+
 ## Project CMakeLists.txt
 
 ```cmake
 cmake_minimum_required(VERSION 3.10)
-project(processing3d)
+project(cpp_3d_jump)
 
 set(CMAKE_CXX_STANDARD 11)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -31,10 +35,10 @@ cmake_minimum_required(VERSION 3.10)
 - Prevents users with old CMake from confusing errors
 
 ```cmake
-project(processing3d)
+project(cpp_3d_jump)
 ```
 - Names the project
-- The executable will be called `processing3d`
+- The executable will be called `cpp_3d_jump`
 
 ```cmake
 set(CMAKE_CXX_STANDARD 11)
@@ -42,6 +46,23 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 ```
 - Use C++11 features (lambdas, auto, nullptr, etc.)
 - `REQUIRED ON` means fail if compiler doesn't support C++11
+
+## Automatic Dependency Download
+
+```cmake
+# Download miniaudio.h if not present
+set(MINIAUDIO_FILE "${CMAKE_SOURCE_DIR}/src/miniaudio.h")
+if(NOT EXISTS ${MINIAUDIO_FILE})
+    message(STATUS "Downloading miniaudio.h...")
+    file(DOWNLOAD
+        "https://raw.githubusercontent.com/mackron/miniaudio/master/miniaudio.h"
+        ${MINIAUDIO_FILE}
+        SHOW_PROGRESS
+    )
+endif()
+```
+
+This downloads the miniaudio single-header library on first build. The file is then cached locally for future builds.
 
 ## Finding Libraries
 

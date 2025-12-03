@@ -1,12 +1,12 @@
-# Processing 3D to C++ Conversion
+# C++ 3D Jump
 
-This is a C++ conversion of the Processing 3D grid navigation sketch.
+A first-person 3D obstacle course game built with C++ and OpenGL.
 
 ## Dependencies
 
 - OpenGL
-- GLEW (OpenGL Extension Wrangler Library)
 - GLFW3 (Graphics Library Framework)
+- FreeType (Font rendering)
 - CMake (build system)
 
 ## Installation of Dependencies
@@ -14,28 +14,30 @@ This is a C++ conversion of the Processing 3D grid navigation sketch.
 ### Ubuntu/Debian:
 
 ```bash
-sudo apt-get install libglew-dev libglfw3-dev cmake build-essential
+sudo apt-get install libglfw3-dev libfreetype-dev libgl1-mesa-dev libglu1-mesa-dev cmake build-essential
 ```
 
 ### Fedora:
 
 ```bash
-sudo dnf install glew-devel glfw-devel cmake gcc-c++
+sudo dnf install glfw-devel freetype-devel mesa-libGL-devel mesa-libGLU-devel cmake gcc-c++
 ```
 
 ### Arch Linux:
 
 ```bash
-sudo pacman -S glew glfw-x11 cmake base-devel
+sudo pacman -S glfw freetype2 mesa glu cmake base-devel
 ```
 
 ### macOS (with Homebrew):
 
 ```bash
-brew install glew glfw cmake
+brew install glfw freetype cmake
 ```
 
 ## Building
+
+> **Note:** The first build requires an internet connection to download [miniaudio.h](https://github.com/mackron/miniaudio) (~1MB). This is done automatically by CMake. Subsequent builds work offline.
 
 ```bash
 mkdir build
@@ -47,7 +49,7 @@ make
 ## Running
 
 ```bash
-./processing3d
+./cpp_3d_jump
 ```
 
 ## Controls
@@ -91,9 +93,17 @@ The sound is generated as a sine wave with harmonics and an envelope for a pleas
 
 ## Notes
 
-- The code uses legacy OpenGL (immediate mode) for simplicity, similar to Processing's approach
-- For production code, consider using modern OpenGL with shaders and VBOs
-- Camera is implemented using manual matrix transformations to match Processing's `camera()` function
+- The code uses legacy OpenGL (immediate mode) for simplicity
+- Camera is implemented using manual matrix transformations
+- Audio is handled by [miniaudio](https://github.com/mackron/miniaudio) (single-header library, downloaded automatically on first build)
+
+## External Dependencies
+
+This project uses the following external library that is downloaded automatically during the first build:
+
+| Library | Purpose | License |
+|---------|---------|---------|
+| [miniaudio](https://github.com/mackron/miniaudio) | Cross-platform audio | Public Domain / MIT-0 |
 
 ## TODOs:
 

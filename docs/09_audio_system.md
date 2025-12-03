@@ -8,6 +8,9 @@ This document explains how sound effects are implemented using the miniaudio lib
 - **Cross-platform**: Works on Windows, macOS, Linux
 - **No dependencies**: Self-contained, no external libraries needed
 - **Simple API**: Easy to use for basic sound effects
+- **Public Domain**: No licensing concerns (MIT-0 / Unlicense)
+
+> **Note:** miniaudio.h is automatically downloaded by CMake on first build. This keeps the repository size small and ensures GitHub correctly detects the project as C++ rather than C.
 
 ## Including miniaudio
 

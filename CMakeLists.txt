@@ -8,6 +8,22 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 # Export compile commands for clangd/IDE support
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
+# Download miniaudio.h if not present
+set(MINIAUDIO_FILE "${CMAKE_SOURCE_DIR}/src/miniaudio.h")
+if(NOT EXISTS ${MINIAUDIO_FILE})
+    message(STATUS "Downloading miniaudio.h...")
+    file(DOWNLOAD
+        "https://raw.githubusercontent.com/mackron/miniaudio/master/miniaudio.h"
+        ${MINIAUDIO_FILE}
+        SHOW_PROGRESS
+        STATUS DOWNLOAD_STATUS
+    )
+    list(GET DOWNLOAD_STATUS 0 STATUS_CODE)
+    if(NOT STATUS_CODE EQUAL 0)
+        message(FATAL_ERROR "Failed to download miniaudio.h")
+    endif()
+endif()
+
 # Find required packages
 find_package(OpenGL REQUIRED)
 find_package(glfw3 REQUIRED)

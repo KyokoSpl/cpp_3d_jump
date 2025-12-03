@@ -21,11 +21,13 @@ Welcome to the detailed documentation for this 3D parkour game built with C++ an
 
 To build and run the game:
 
+> **Note:** The first build requires an internet connection to download [miniaudio.h](https://github.com/mackron/miniaudio) (~1MB). This is done automatically by CMake. Subsequent builds work offline.
+
 ```bash
 cd build
 cmake ..
 make -j4
-./processing3d
+./cpp_3d_jump
 ```
 
 ## Project Structure
@@ -38,7 +40,6 @@ cpp_3d_jump/
 │   ├── Obstacle.cpp/h         # Parkour course, collision detection
 │   ├── Grid.cpp/h             # Ground grid rendering
 │   ├── Projectile.cpp/h       # Projectile system (optional feature)
-│   ├── miniaudio.h            # Single-header audio library
 │   └── menus/                 # Menu system (split into modules)
 │       ├── Menu.cpp/h         # Core menu functionality
 │       ├── MenuRender.cpp     # All rendering logic (830 lines)
@@ -46,7 +47,7 @@ cpp_3d_jump/
 │       ├── MenuAudio.cpp/h    # Audio system (151 lines)
 │       ├── Settings.cpp/h     # Settings management (145 lines)
 │       └── Leaderboard.cpp/h  # Leaderboard data (153 lines)
-├── CMakeLists.txt             # Build configuration
+├── CMakeLists.txt             # Build configuration (auto-downloads miniaudio.h)
 ├── asset/                     # Game assets (fonts, sounds)
 ├── build/                     # Build output (includes leaderboard.json)
 └── docs/                      # This documentation

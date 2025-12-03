@@ -120,9 +120,6 @@ The projectile/arrow system:
 - Arrow movement and rendering
 - Player collision detection
 
-### src/miniaudio.h
-Single-header audio library for cross-platform sound.
-
 ## Libraries Used
 
 ### GLFW (Graphics Library Framework)
@@ -154,7 +151,7 @@ glEnd();
 Renders text using TrueType fonts (.ttf files).
 
 ### miniaudio
-Single-header library for playing sounds. Works on Windows, Mac, and Linux.
+Single-header library for playing sounds. Works on Windows, Mac, and Linux. This is automatically downloaded by CMake on first build (requires internet connection once).
 
 ## Next Steps
 
