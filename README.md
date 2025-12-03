@@ -12,21 +12,25 @@ This is a C++ conversion of the Processing 3D grid navigation sketch.
 ## Installation of Dependencies
 
 ### Ubuntu/Debian:
+
 ```bash
 sudo apt-get install libglew-dev libglfw3-dev cmake build-essential
 ```
 
 ### Fedora:
+
 ```bash
 sudo dnf install glew-devel glfw-devel cmake gcc-c++
 ```
 
 ### Arch Linux:
+
 ```bash
 sudo pacman -S glew glfw-x11 cmake base-devel
 ```
 
 ### macOS (with Homebrew):
+
 ```bash
 brew install glew glfw cmake
 ```
@@ -91,9 +95,9 @@ The sound is generated as a sine wave with harmonics and an envelope for a pleas
 - For production code, consider using modern OpenGL with shaders and VBOs
 - Camera is implemented using manual matrix transformations to match Processing's `camera()` function
 
-
 ## TODOs:
--[ ] implement server side time saving for leader board (database and api prob)
--[ ] fix I hate my self not possible
--[ ] add crouching, wallriding and double jump obsticales that work
--[ ] sprint ability with storing velocity for further jumps if jumped while sprint
+
+- [ ] implement server side time saving for leader board (database and api prob)
+- [ ] fix I hate my self difficulty (just spam space and run forward to complete, no kind of difficulty if exploit is known)
+- [ ] add crouching, wallriding and double jump obsticales that work
+- [ ] sprint ability with storing velocity for further jumps if jumped while sprint
