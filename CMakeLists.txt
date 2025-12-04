@@ -90,3 +90,18 @@ file(COPY ${CMAKE_SOURCE_DIR}/asset DESTINATION ${CMAKE_BINARY_DIR})
 if(CMAKE_COMPILER_IS_GNUCXX OR CMAKE_CXX_COMPILER_ID MATCHES "Clang")
     target_compile_options(cpp_3d_jump PRIVATE -Wall -Wextra)
 endif()
+
+if(MSVC)
+    # Visual Studio specific settings
+    target_compile_options(cpp_3d_jump PRIVATE /W3 /MP)
+    # Set working directory to project root for debugging
+    set_target_properties(cpp_3d_jump PROPERTIES
+        VS_DEBUGGER_WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}"
+    )
+    # Enable Edit and Continue for Debug builds
+    target_compile_options(cpp_3d_jump PRIVATE "$<$<CONFIG:Debug>:/ZI>")
+    target_link_options(cpp_3d_jump PRIVATE "$<$<CONFIG:Debug>:/INCREMENTAL>")
+    # Organize source files in VS Solution Explorer
+    source_group(TREE ${CMAKE_SOURCE_DIR}/src PREFIX "Source Files" FILES ${SOURCES})
+    source_group(TREE ${CMAKE_SOURCE_DIR}/src PREFIX "Header Files" FILES ${HEADERS})
+endif()

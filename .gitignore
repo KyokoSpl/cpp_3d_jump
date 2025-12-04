@@ -2,10 +2,16 @@
 .cache/
 build/
 build-*/
+build_vs/
 bin/
 obj/
 out/
 packages/
+
+# Visual Studio
+.vs/
+*.vcxproj.user
+CMakeSettings.json
 
 # External dependencies (downloaded during build)
 src/miniaudio.h
